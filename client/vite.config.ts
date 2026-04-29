@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon-180x180.png'],
       manifest: {
-        name: 'ipê.city Marketplace',
-        short_name: 'ipê.city',
+        name: 'IPE Store',
+        short_name: 'IPE Store',
         description: 'Onchain merch for the ipê.city community.',
         start_url: '/',
         scope: '/',

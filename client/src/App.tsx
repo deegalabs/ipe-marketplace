@@ -25,7 +25,7 @@ export function App() {
       <BottomNav />
       <InstallPrompt />
       <footer className="hidden sm:block text-center text-xs text-ipe-ink/50 py-6">
-        ipê.city marketplace · onchain on Base · paid in $IPE
+        IPE Store · onchain on Base · merch by ipê.city
       </footer>
     </div>
   );
@@ -42,8 +42,8 @@ function Header() {
     >
       <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center justify-between sm:gap-6">
-          <Link href="/" className="font-display font-bold text-ipe-green text-lg">
-            ipê.city
+          <Link href="/" className="font-display font-bold text-ipe-green text-lg tracking-tight">
+            IPE Store
           </Link>
           {/* Inline nav links visible only on desktop; mobile uses BottomNav. */}
           <nav className="hidden sm:flex gap-4 text-sm">
