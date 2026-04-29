@@ -17,7 +17,8 @@
     "contracts:test": "cd contracts && forge test -vv",
     "contracts:deploy:sepolia": "cd contracts && forge script script/Deploy.s.sol --rpc-url $BASE_SEPOLIA_RPC --broadcast --verify",
     "db:push": "npm --workspace server run db:push",
-    "seed": "npm --workspace server run seed"
+    "seed": "npm --workspace server run seed",
+    "push-onchain": "npm --workspace server run push-onchain"
   },
   "devDependencies": {
     "drizzle-orm": "^0.39.3",

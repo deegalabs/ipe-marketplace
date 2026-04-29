@@ -9,7 +9,8 @@
     "start": "node dist/index.js",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "seed": "tsx src/scripts/seed.ts"
+    "seed": "tsx src/scripts/seed.ts",
+    "push-onchain": "tsx src/scripts/push-onchain.ts"
   },
   "dependencies": {
     "@ipe/shared": "*",
