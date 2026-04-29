@@ -130,13 +130,13 @@ export function ProductPage() {
   })();
 
   return (
-    <article className="grid md:grid-cols-2 gap-8">
-      <img src={p.imageUrl} alt={p.name} className="card aspect-square object-cover" />
+    <article className="grid md:grid-cols-2 gap-6 sm:gap-8">
+      <img src={p.imageUrl} alt={p.name} className="card aspect-square object-cover w-full" />
       <div className="space-y-5">
         <div>
-          <h1 className="text-3xl font-bold text-ipe-green">{p.name}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-ipe-green">{p.name}</h1>
           <p className="text-xl mt-2">{priceDisplay(p, currency, rates)}</p>
-          <p className="text-ipe-ink/70 mt-4">{p.description}</p>
+          <p className="text-ipe-ink/70 mt-4 text-sm sm:text-base">{p.description}</p>
         </div>
 
         {tokenId === null ? (

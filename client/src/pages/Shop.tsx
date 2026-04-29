@@ -14,8 +14,8 @@ export function Shop() {
 
   return (
     <section>
-      <h1 className="text-3xl font-bold text-ipe-green mb-6">Shop</h1>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <h1 className="text-2xl sm:text-3xl font-bold text-ipe-green mb-4 sm:mb-6">Shop</h1>
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {data.filter((p) => p.active).map((p) => (
           <Link key={p.id} href={`/product/${p.id}`} className="card hover:shadow-md transition">
             <img src={p.imageUrl} alt={p.name} className="aspect-square object-cover w-full" />

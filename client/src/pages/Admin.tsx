@@ -40,6 +40,7 @@ function TreasuryCard({ data }: { data: Awaited<ReturnType<typeof api.treasury>>
     <div className="card p-5">
       <h2 className="text-xl font-semibold text-ipe-green mb-3">Treasury</h2>
       <p className="text-xs text-ipe-ink/60 font-mono break-all mb-3">{data.treasuryAddress}</p>
+      <div className="table-wrap">
       <table className="w-full text-sm">
         <thead className="text-left text-ipe-ink/60">
           <tr><th>Token</th><th>Treasury</th><th>In contract (orphan)</th></tr>
@@ -58,6 +59,7 @@ function TreasuryCard({ data }: { data: Awaited<ReturnType<typeof api.treasury>>
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -196,53 +198,97 @@ function ProductsCard({ products }: { products: ProductDTO[] }) {
         />
       )}
 
-      <table className="w-full text-sm mt-4">
-        <thead className="text-left text-ipe-ink/60">
-          <tr>
-            <th className="py-2">Product</th>
-            <th>Onchain</th>
-            <th>IPE</th>
-            <th>USDC</th>
-            <th>BRL</th>
-            <th>Stock</th>
-            <th>Active</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {products.map((p) => (
-            <tr key={p.id} className="border-t border-ipe-green/10">
-              <td className="py-2">{p.name}</td>
-              <td>{p.tokenId ? <span className="text-green-700">#{p.tokenId}</span> : <span className="text-amber-700">offline</span>}</td>
-              <td>{BigInt(p.priceIpe) > 0n ? formatToken(p.priceIpe, 'IPE') : '—'}</td>
-              <td>{BigInt(p.priceUsdc) > 0n ? formatToken(p.priceUsdc, 'USDC') : '—'}</td>
-              <td>{BigInt(p.priceBrl) > 0n ? formatBrl(p.priceBrl) : '—'}</td>
-              <td>{p.physicalStock}</td>
-              <td>{p.active ? '✓' : '—'}</td>
-              <td className="space-x-2 whitespace-nowrap">
-                <button className="btn-ghost text-xs" onClick={() => setEditing(p.id)} disabled={busyId === p.id}>
-                  Edit
+      {/* Mobile: stacked cards. Desktop: table. */}
+      <ul className="sm:hidden space-y-3 mt-4">
+        {products.map((p) => (
+          <li key={p.id} className="border border-ipe-green/10 rounded-md p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-medium">{p.name}</p>
+                <p className="text-xs text-ipe-ink/60">
+                  {p.tokenId ? <span className="text-green-700">onchain #{p.tokenId}</span> : <span className="text-amber-700">offline</span>}
+                  {' · stock '}{p.physicalStock}{p.active ? '' : ' · inactive'}
+                </p>
+              </div>
+              <button className="btn-ghost text-xs" onClick={() => setEditing(p.id)} disabled={busyId === p.id}>
+                Edit
+              </button>
+            </div>
+            <dl className="grid grid-cols-3 gap-2 mt-3 text-xs">
+              <div><dt className="text-ipe-ink/50">IPE</dt><dd>{BigInt(p.priceIpe) > 0n ? formatToken(p.priceIpe, 'IPE') : '—'}</dd></div>
+              <div><dt className="text-ipe-ink/50">USDC</dt><dd>{BigInt(p.priceUsdc) > 0n ? formatToken(p.priceUsdc, 'USDC') : '—'}</dd></div>
+              <div><dt className="text-ipe-ink/50">BRL</dt><dd>{BigInt(p.priceBrl) > 0n ? formatBrl(p.priceBrl) : '—'}</dd></div>
+            </dl>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {!p.tokenId && (
+                <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => pushOnchain(p)}>
+                  {busyId === p.id ? 'Pushing…' : 'Push onchain'}
                 </button>
-                {!p.tokenId && (
-                  <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => pushOnchain(p)}>
-                    {busyId === p.id ? 'Pushing…' : 'Push onchain'}
-                  </button>
-                )}
-                {p.tokenId && BigInt(p.priceIpe) > 0n && (
-                  <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'ipe')}>
-                    Sync IPE
-                  </button>
-                )}
-                {p.tokenId && BigInt(p.priceUsdc) > 0n && (
-                  <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'usdc')}>
-                    Sync USDC
-                  </button>
-                )}
-              </td>
+              )}
+              {p.tokenId && BigInt(p.priceIpe) > 0n && (
+                <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'ipe')}>
+                  Sync IPE
+                </button>
+              )}
+              {p.tokenId && BigInt(p.priceUsdc) > 0n && (
+                <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'usdc')}>
+                  Sync USDC
+                </button>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <div className="hidden sm:block table-wrap mt-4">
+        <table className="w-full text-sm">
+          <thead className="text-left text-ipe-ink/60">
+            <tr>
+              <th className="py-2">Product</th>
+              <th>Onchain</th>
+              <th>IPE</th>
+              <th>USDC</th>
+              <th>BRL</th>
+              <th>Stock</th>
+              <th>Active</th>
+              <th></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {products.map((p) => (
+              <tr key={p.id} className="border-t border-ipe-green/10">
+                <td className="py-2">{p.name}</td>
+                <td>{p.tokenId ? <span className="text-green-700">#{p.tokenId}</span> : <span className="text-amber-700">offline</span>}</td>
+                <td>{BigInt(p.priceIpe) > 0n ? formatToken(p.priceIpe, 'IPE') : '—'}</td>
+                <td>{BigInt(p.priceUsdc) > 0n ? formatToken(p.priceUsdc, 'USDC') : '—'}</td>
+                <td>{BigInt(p.priceBrl) > 0n ? formatBrl(p.priceBrl) : '—'}</td>
+                <td>{p.physicalStock}</td>
+                <td>{p.active ? '✓' : '—'}</td>
+                <td className="space-x-2 whitespace-nowrap">
+                  <button className="btn-ghost text-xs" onClick={() => setEditing(p.id)} disabled={busyId === p.id}>
+                    Edit
+                  </button>
+                  {!p.tokenId && (
+                    <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => pushOnchain(p)}>
+                      {busyId === p.id ? 'Pushing…' : 'Push onchain'}
+                    </button>
+                  )}
+                  {p.tokenId && BigInt(p.priceIpe) > 0n && (
+                    <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'ipe')}>
+                      Sync IPE
+                    </button>
+                  )}
+                  {p.tokenId && BigInt(p.priceUsdc) > 0n && (
+                    <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'usdc')}>
+                      Sync USDC
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -301,10 +347,10 @@ function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormP
         <h3 className="font-medium text-ipe-green">{mode === 'new' ? 'New product' : 'Edit product'}</h3>
         <button className="text-xs text-ipe-ink/60 hover:text-ipe-ink" onClick={onClose}>cancel</button>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <input className="input" placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
         <input className="input" placeholder="Image URL" value={draft.imageUrl} onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })} />
-        <input className="input col-span-2" placeholder="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+        <input className="input sm:col-span-2" placeholder="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
         <select className="input" value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value as ProductDraft['category'] })}>
           <option value="t-shirt">t-shirt</option>
           <option value="hoodie">hoodie</option>
@@ -343,13 +389,13 @@ function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormP
         </label>
 
         {mode === 'edit' && (
-          <p className="col-span-2 text-xs text-amber-700">
+          <p className="sm:col-span-2 text-xs text-amber-700">
             Editing prices off-chain only. Once saved, click <strong>Sync IPE</strong> / <strong>Sync USDC</strong>
             on the row to push the new price to the contract (owner-only tx).
           </p>
         )}
-        {error && <p className="col-span-2 text-sm text-red-700">{error}</p>}
-        <button className="btn-primary col-span-2" onClick={save} disabled={saving}>
+        {error && <p className="sm:col-span-2 text-sm text-red-700">{error}</p>}
+        <button className="btn-primary sm:col-span-2" onClick={save} disabled={saving}>
           {saving ? 'Saving…' : mode === 'new' ? 'Create product' : 'Save changes'}
         </button>
       </div>
@@ -372,39 +418,32 @@ function OrdersCard({ orders, products }: { orders: OrderDTO[]; products: Produc
       {orders.length === 0 ? (
         <p className="text-ipe-ink/60 text-sm">No orders yet.</p>
       ) : (
-        <table className="w-full text-sm">
-          <thead className="text-left text-ipe-ink/60">
-            <tr>
-              <th className="py-2">Order</th>
-              <th>Product</th>
-              <th>Buyer</th>
-              <th>Method</th>
-              <th>Total</th>
-              <th>Delivery</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
+        <>
+          {/* Mobile: stacked cards */}
+          <ul className="sm:hidden space-y-3">
             {orders.map((o) => {
               const p = productById.get(o.productId);
               const addr = o.shippingAddress as { line1?: string; city?: string; country?: string } | null;
               return (
-                <tr key={o.id} className="border-t border-ipe-green/10 align-top">
-                  <td className="py-2 font-mono text-xs">{o.id.slice(0, 8)}</td>
-                  <td>{p?.name ?? '?'} ×{o.quantity}</td>
-                  <td className="font-mono text-xs">{o.buyerAddress.slice(0, 10)}…</td>
-                  <td className="uppercase text-xs">{o.paymentMethod}</td>
-                  <td>{formatPaid(o)}</td>
-                  <td className="text-xs">
+                <li key={o.id} className="border border-ipe-green/10 rounded-md p-3">
+                  <div className="flex justify-between gap-2">
+                    <div>
+                      <p className="font-medium">{p?.name ?? '?'} ×{o.quantity}</p>
+                      <p className="text-xs text-ipe-ink/60 font-mono">{o.id.slice(0, 8)} · {o.buyerAddress.slice(0, 8)}…</p>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 h-fit rounded ${badgeForStatus(o.status)}`}>{o.status}</span>
+                  </div>
+                  <p className="text-sm mt-2">
+                    {formatPaid(o)} <span className="text-xs text-ipe-ink/60 uppercase">· {o.paymentMethod}</span>
+                  </p>
+                  <p className="text-xs text-ipe-ink/60 mt-1">
                     {o.deliveryMethod === 'shipping' && addr
                       ? `→ ${addr.line1}, ${addr.city} (${addr.country})`
                       : o.deliveryMethod === 'pickup' && o.pickup
                         ? `pickup @ ${o.pickup.eventId} (${o.pickup.displayName})`
                         : '—'}
-                  </td>
-                  <td>{o.status}</td>
-                  <td>
+                  </p>
+                  <div className="mt-2">
                     {o.status === 'paid' && (
                       <button className="btn-ghost text-xs" onClick={() => setStatus(o.id, 'shipped')}>
                         {o.deliveryMethod === 'pickup' ? 'Mark delivered' : 'Mark shipped'}
@@ -415,15 +454,79 @@ function OrdersCard({ orders, products }: { orders: OrderDTO[]; products: Produc
                         Mark delivered
                       </button>
                     )}
-                  </td>
-                </tr>
+                  </div>
+                </li>
               );
             })}
-          </tbody>
-        </table>
+          </ul>
+
+          <div className="hidden sm:block table-wrap">
+            <table className="w-full text-sm">
+              <thead className="text-left text-ipe-ink/60">
+                <tr>
+                  <th className="py-2">Order</th>
+                  <th>Product</th>
+                  <th>Buyer</th>
+                  <th>Method</th>
+                  <th>Total</th>
+                  <th>Delivery</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((o) => {
+                  const p = productById.get(o.productId);
+                  const addr = o.shippingAddress as { line1?: string; city?: string; country?: string } | null;
+                  return (
+                    <tr key={o.id} className="border-t border-ipe-green/10 align-top">
+                      <td className="py-2 font-mono text-xs">{o.id.slice(0, 8)}</td>
+                      <td>{p?.name ?? '?'} ×{o.quantity}</td>
+                      <td className="font-mono text-xs">{o.buyerAddress.slice(0, 10)}…</td>
+                      <td className="uppercase text-xs">{o.paymentMethod}</td>
+                      <td>{formatPaid(o)}</td>
+                      <td className="text-xs">
+                        {o.deliveryMethod === 'shipping' && addr
+                          ? `→ ${addr.line1}, ${addr.city} (${addr.country})`
+                          : o.deliveryMethod === 'pickup' && o.pickup
+                            ? `pickup @ ${o.pickup.eventId} (${o.pickup.displayName})`
+                            : '—'}
+                      </td>
+                      <td>{o.status}</td>
+                      <td>
+                        {o.status === 'paid' && (
+                          <button className="btn-ghost text-xs" onClick={() => setStatus(o.id, 'shipped')}>
+                            {o.deliveryMethod === 'pickup' ? 'Mark delivered' : 'Mark shipped'}
+                          </button>
+                        )}
+                        {o.status === 'shipped' && (
+                          <button className="btn-ghost text-xs" onClick={() => setStatus(o.id, 'delivered')}>
+                            Mark delivered
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
+}
+
+function badgeForStatus(s: string) {
+  switch (s) {
+    case 'paid': return 'bg-blue-100 text-blue-800';
+    case 'awaiting_payment': return 'bg-purple-100 text-purple-800';
+    case 'shipped': return 'bg-amber-100 text-amber-800';
+    case 'delivered': return 'bg-green-100 text-green-800';
+    case 'refunded':
+    case 'cancelled': return 'bg-red-100 text-red-800';
+    default: return 'bg-gray-100 text-gray-700';
+  }
 }
 
 function formatPaid(o: OrderDTO): string {
