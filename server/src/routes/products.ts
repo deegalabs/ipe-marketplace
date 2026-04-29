@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { eq } from 'drizzle-orm';
 import { productInputSchema } from '@ipe/shared';
 import { db, schema } from '../db/client.js';
+import { normalizeImageUrl } from '../lib/imageUrl.js';
 
 export const productsRouter = Router();
 
@@ -35,11 +36,15 @@ productsRouter.patch('/:id', async (req, res) => {
   res.json(serialize(row));
 });
 
-/// Convert bigint fields to strings so drizzle's numeric(78,0) accepts them at runtime.
+/// Convert bigint fields to strings so drizzle's numeric(78,0) accepts them at runtime,
+/// and normalize image URLs so Google Drive share links become loadable image URLs.
 function toRow<T extends Record<string, unknown>>(data: T): Record<string, unknown> {
   const out: Record<string, unknown> = { ...data };
   for (const k of ['priceIpe', 'priceUsdc', 'maxSupply']) {
     if (typeof out[k] === 'bigint') out[k] = (out[k] as bigint).toString();
+  }
+  if (typeof out.imageUrl === 'string') {
+    out.imageUrl = normalizeImageUrl(out.imageUrl);
   }
   return out;
 }

@@ -6,6 +6,7 @@ import { IpeMarketAbi } from '@ipe/shared';
 import { api, type ProductDTO, type OrderDTO } from '../api';
 import { env } from '../config';
 import { formatToken, formatBrl } from '../lib/format';
+import { normalizeImageUrl } from '../lib/imageUrl';
 import { useCurrency } from '../lib/currency';
 
 export function Admin() {
@@ -349,7 +350,7 @@ function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormP
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <input className="input" placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-        <input className="input" placeholder="Image URL" value={draft.imageUrl} onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })} />
+        <ImageUrlField value={draft.imageUrl} onChange={(v) => setDraft({ ...draft, imageUrl: v })} />
         <input className="input sm:col-span-2" placeholder="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
         <select className="input" value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value as ProductDraft['category'] })}>
           <option value="t-shirt">t-shirt</option>
@@ -527,6 +528,44 @@ function badgeForStatus(s: string) {
     case 'cancelled': return 'bg-red-100 text-red-800';
     default: return 'bg-gray-100 text-gray-700';
   }
+}
+
+/// Image URL input that previews the resolved image and accepts Google Drive
+/// share links (auto-rewritten to googleusercontent thumbnails).
+function ImageUrlField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const resolved = value ? normalizeImageUrl(value, 256) : '';
+  const isDrive = resolved !== value.trim() && !!value;
+  return (
+    <div className="flex gap-3">
+      <div className="flex-1 space-y-1">
+        <input
+          className="input"
+          placeholder="Image URL or Google Drive share link"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        {isDrive && (
+          <p className="text-[10px] text-ipe-green/70 truncate" title={resolved}>
+            Drive link rewritten on save → {resolved.replace('https://lh3.googleusercontent.com/d/', '…/')}
+          </p>
+        )}
+      </div>
+      <div className="w-16 h-16 rounded border border-ipe-green/20 bg-ipe-green/5 overflow-hidden flex items-center justify-center text-[10px] text-ipe-ink/50 shrink-0">
+        {resolved ? (
+          <img
+            src={resolved}
+            alt="preview"
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : (
+          'preview'
+        )}
+      </div>
+    </div>
+  );
 }
 
 function formatPaid(o: OrderDTO): string {
