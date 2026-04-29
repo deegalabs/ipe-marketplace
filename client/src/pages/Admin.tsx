@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
-import { parseUnits, decodeEventLog, type Hex } from 'viem';
+import { formatUnits, parseUnits, decodeEventLog, type Hex } from 'viem';
 import { IpeMarketAbi } from '@ipe/shared';
 import { api, type ProductDTO, type OrderDTO } from '../api';
 import { env } from '../config';
@@ -93,43 +93,30 @@ const EMPTY_DRAFT: ProductDraft = {
   shippingAvailable: true,
 };
 
+function draftFromProduct(p: ProductDTO): ProductDraft {
+  return {
+    name: p.name,
+    description: p.description,
+    category: p.category as ProductDraft['category'],
+    imageUrl: p.imageUrl,
+    priceIpe: BigInt(p.priceIpe) > 0n ? formatUnits(BigInt(p.priceIpe), 18) : '0',
+    priceUsdc: BigInt(p.priceUsdc) > 0n ? formatUnits(BigInt(p.priceUsdc), 6) : '0',
+    priceBrl: BigInt(p.priceBrl) > 0n ? (Number(BigInt(p.priceBrl)) / 100).toFixed(2) : '0',
+    maxSupply: p.maxSupply,
+    royaltyBps: p.royaltyBps,
+    physicalStock: p.physicalStock,
+    pickupAvailable: p.pickupAvailable,
+    shippingAvailable: p.shippingAvailable,
+  };
+}
+
 function ProductsCard({ products }: { products: ProductDTO[] }) {
   const qc = useQueryClient();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
-  const { rates } = useCurrency();
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<ProductDraft>(EMPTY_DRAFT);
-
-  function suggestPrices() {
-    if (!rates?.ipeUsd || !rates.usdcBrl) {
-      alert('Rates not ready — try again in a moment.');
-      return;
-    }
-    // Use BRL as the reference and back-fill the other two.
-    const brl = Number(draft.priceBrl);
-    const usdcPerBrl = 1 / Number(rates.usdcBrl);
-    const usdc = brl * usdcPerBrl;
-    const ipe = usdc / Number(rates.ipeUsd);
-    setDraft({
-      ...draft,
-      priceUsdc: usdc.toFixed(2),
-      priceIpe: ipe.toFixed(2),
-    });
-  }
-
-  async function createOffchain() {
-    await api.createProduct({
-      ...draft,
-      priceIpe: parseUnits(draft.priceIpe, 18).toString(),
-      priceUsdc: parseUnits(draft.priceUsdc, 6).toString(),
-      priceBrl: BigInt(Math.round(Number(draft.priceBrl) * 100)).toString(),
-      maxSupply: draft.maxSupply,
-      active: true,
-    });
-    await qc.invalidateQueries({ queryKey: ['products'] });
-    setDraft(EMPTY_DRAFT);
-  }
+  /// null = closed, 'new' = creating, '<uuid>' = editing that product
+  const [editing, setEditing] = useState<string | 'new' | null>(null);
 
   async function pushOnchain(p: ProductDTO) {
     if (!publicClient) return;
@@ -167,54 +154,49 @@ function ProductsCard({ products }: { products: ProductDTO[] }) {
     }
   }
 
+  /// Push the off-chain price for a single token to the contract via setPrice.
+  /// Reads the current DB value (in smallest unit) and sends it. Owner-only onchain.
+  async function syncPriceOnchain(p: ProductDTO, token: 'ipe' | 'usdc') {
+    if (!publicClient || !p.tokenId) return;
+    const tokenAddr = token === 'ipe' ? env.ipeToken : env.usdcToken;
+    const newPrice = BigInt(token === 'ipe' ? p.priceIpe : p.priceUsdc);
+    setBusyId(p.id);
+    try {
+      const hash = await writeContractAsync({
+        address: env.ipeMarket,
+        abi: IpeMarketAbi,
+        functionName: 'setPrice',
+        args: [BigInt(p.tokenId), tokenAddr, newPrice],
+      });
+      await publicClient.waitForTransactionReceipt({ hash });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <div className="card p-5">
-      <h2 className="text-xl font-semibold text-ipe-green mb-3">Products</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xl font-semibold text-ipe-green">Products</h2>
+        {editing === null && (
+          <button className="btn-ghost text-xs" onClick={() => setEditing('new')}>+ New product</button>
+        )}
+      </div>
 
-      <details className="mb-4">
-        <summary className="cursor-pointer text-sm text-ipe-green">+ New product</summary>
-        <div className="grid grid-cols-2 gap-3 mt-3">
-          <input className="input" placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-          <input className="input" placeholder="Image URL" value={draft.imageUrl} onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })} />
-          <input className="input" placeholder="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
-          <select className="input" value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value as ProductDraft['category'] })}>
-            <option value="t-shirt">t-shirt</option>
-            <option value="hoodie">hoodie</option>
-            <option value="cup">cup</option>
-            <option value="cap">cap</option>
-            <option value="other">other</option>
-          </select>
-          <div>
-            <label className="label">Price IPE</label>
-            <input className="input" value={draft.priceIpe} onChange={(e) => setDraft({ ...draft, priceIpe: e.target.value })} />
-          </div>
-          <div>
-            <label className="label">Price USDC</label>
-            <input className="input" value={draft.priceUsdc} onChange={(e) => setDraft({ ...draft, priceUsdc: e.target.value })} />
-          </div>
-          <div>
-            <label className="label">Price BRL (R$)</label>
-            <input className="input" value={draft.priceBrl} onChange={(e) => setDraft({ ...draft, priceBrl: e.target.value })} />
-          </div>
-          <button type="button" className="btn-ghost text-xs" onClick={suggestPrices}>
-            Suggest from BRL using live rates
-          </button>
-          <input className="input" placeholder="Max supply (0 = ∞)" value={draft.maxSupply} onChange={(e) => setDraft({ ...draft, maxSupply: e.target.value })} />
-          <input className="input" type="number" placeholder="Royalty bps" value={draft.royaltyBps} onChange={(e) => setDraft({ ...draft, royaltyBps: Number(e.target.value) })} />
-          <input className="input" type="number" placeholder="Physical stock" value={draft.physicalStock} onChange={(e) => setDraft({ ...draft, physicalStock: Number(e.target.value) })} />
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={draft.shippingAvailable} onChange={(e) => setDraft({ ...draft, shippingAvailable: e.target.checked })} />
-            Allow shipping
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={draft.pickupAvailable} onChange={(e) => setDraft({ ...draft, pickupAvailable: e.target.checked })} />
-            Allow event pickup
-          </label>
-          <button className="btn-primary col-span-2" onClick={createOffchain}>Save (off-chain)</button>
-        </div>
-      </details>
+      {editing !== null && (
+        <ProductForm
+          mode={editing === 'new' ? 'new' : 'edit'}
+          initial={editing === 'new' ? EMPTY_DRAFT : draftFromProduct(products.find((p) => p.id === editing)!)}
+          targetId={editing === 'new' ? null : editing}
+          onClose={() => setEditing(null)}
+          onSaved={async () => {
+            await qc.invalidateQueries({ queryKey: ['products'] });
+            setEditing(null);
+          }}
+        />
+      )}
 
-      <table className="w-full text-sm">
+      <table className="w-full text-sm mt-4">
         <thead className="text-left text-ipe-ink/60">
           <tr>
             <th className="py-2">Product</th>
@@ -223,6 +205,7 @@ function ProductsCard({ products }: { products: ProductDTO[] }) {
             <th>USDC</th>
             <th>BRL</th>
             <th>Stock</th>
+            <th>Active</th>
             <th></th>
           </tr>
         </thead>
@@ -235,10 +218,24 @@ function ProductsCard({ products }: { products: ProductDTO[] }) {
               <td>{BigInt(p.priceUsdc) > 0n ? formatToken(p.priceUsdc, 'USDC') : '—'}</td>
               <td>{BigInt(p.priceBrl) > 0n ? formatBrl(p.priceBrl) : '—'}</td>
               <td>{p.physicalStock}</td>
-              <td>
+              <td>{p.active ? '✓' : '—'}</td>
+              <td className="space-x-2 whitespace-nowrap">
+                <button className="btn-ghost text-xs" onClick={() => setEditing(p.id)} disabled={busyId === p.id}>
+                  Edit
+                </button>
                 {!p.tokenId && (
                   <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => pushOnchain(p)}>
                     {busyId === p.id ? 'Pushing…' : 'Push onchain'}
+                  </button>
+                )}
+                {p.tokenId && BigInt(p.priceIpe) > 0n && (
+                  <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'ipe')}>
+                    Sync IPE
+                  </button>
+                )}
+                {p.tokenId && BigInt(p.priceUsdc) > 0n && (
+                  <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'usdc')}>
+                    Sync USDC
                   </button>
                 )}
               </td>
@@ -246,6 +243,116 @@ function ProductsCard({ products }: { products: ProductDTO[] }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+interface ProductFormProps {
+  mode: 'new' | 'edit';
+  initial: ProductDraft;
+  /// product UUID when editing, null when creating
+  targetId: string | null;
+  onClose: () => void;
+  onSaved: () => void | Promise<void>;
+}
+
+function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormProps) {
+  const { rates } = useCurrency();
+  const [draft, setDraft] = useState<ProductDraft>(initial);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function suggestPrices() {
+    if (!rates?.ipeUsd || !rates.usdcBrl) {
+      alert('Rates not ready — try again in a moment.');
+      return;
+    }
+    const brl = Number(draft.priceBrl);
+    const usdcPerBrl = 1 / Number(rates.usdcBrl);
+    const usdc = brl * usdcPerBrl;
+    const ipe = usdc / Number(rates.ipeUsd);
+    setDraft({ ...draft, priceUsdc: usdc.toFixed(2), priceIpe: ipe.toFixed(2) });
+  }
+
+  async function save() {
+    setError(null);
+    setSaving(true);
+    try {
+      const body = {
+        ...draft,
+        priceIpe: parseUnits(draft.priceIpe || '0', 18).toString(),
+        priceUsdc: parseUnits(draft.priceUsdc || '0', 6).toString(),
+        priceBrl: BigInt(Math.round(Number(draft.priceBrl || '0') * 100)).toString(),
+        maxSupply: draft.maxSupply || '0',
+      };
+      if (mode === 'new') await api.createProduct({ ...body, active: true });
+      else await api.updateProduct(targetId!, body);
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'save failed');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="border border-ipe-green/20 rounded-md p-4 bg-ipe-green/5">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-medium text-ipe-green">{mode === 'new' ? 'New product' : 'Edit product'}</h3>
+        <button className="text-xs text-ipe-ink/60 hover:text-ipe-ink" onClick={onClose}>cancel</button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <input className="input" placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+        <input className="input" placeholder="Image URL" value={draft.imageUrl} onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })} />
+        <input className="input col-span-2" placeholder="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+        <select className="input" value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value as ProductDraft['category'] })}>
+          <option value="t-shirt">t-shirt</option>
+          <option value="hoodie">hoodie</option>
+          <option value="cup">cup</option>
+          <option value="cap">cap</option>
+          <option value="other">other</option>
+        </select>
+        <input className="input" placeholder="Max supply (0 = ∞)" value={draft.maxSupply} onChange={(e) => setDraft({ ...draft, maxSupply: e.target.value })} />
+
+        <div>
+          <label className="label">Price IPE</label>
+          <input className="input" value={draft.priceIpe} onChange={(e) => setDraft({ ...draft, priceIpe: e.target.value })} />
+        </div>
+        <div>
+          <label className="label">Price USDC</label>
+          <input className="input" value={draft.priceUsdc} onChange={(e) => setDraft({ ...draft, priceUsdc: e.target.value })} />
+        </div>
+        <div>
+          <label className="label">Price BRL (R$)</label>
+          <input className="input" value={draft.priceBrl} onChange={(e) => setDraft({ ...draft, priceBrl: e.target.value })} />
+        </div>
+        <button type="button" className="btn-ghost text-xs self-end" onClick={suggestPrices}>
+          Suggest from BRL using live rates
+        </button>
+
+        <input className="input" type="number" placeholder="Royalty bps" value={draft.royaltyBps} onChange={(e) => setDraft({ ...draft, royaltyBps: Number(e.target.value) })} />
+        <input className="input" type="number" placeholder="Physical stock" value={draft.physicalStock} onChange={(e) => setDraft({ ...draft, physicalStock: Number(e.target.value) })} />
+
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={draft.shippingAvailable} onChange={(e) => setDraft({ ...draft, shippingAvailable: e.target.checked })} />
+          Allow shipping
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={draft.pickupAvailable} onChange={(e) => setDraft({ ...draft, pickupAvailable: e.target.checked })} />
+          Allow event pickup
+        </label>
+
+        {mode === 'edit' && (
+          <p className="col-span-2 text-xs text-amber-700">
+            Editing prices off-chain only. Once saved, click <strong>Sync IPE</strong> / <strong>Sync USDC</strong>
+            on the row to push the new price to the contract (owner-only tx).
+          </p>
+        )}
+        {error && <p className="col-span-2 text-sm text-red-700">{error}</p>}
+        <button className="btn-primary col-span-2" onClick={save} disabled={saving}>
+          {saving ? 'Saving…' : mode === 'new' ? 'Create product' : 'Save changes'}
+        </button>
+      </div>
     </div>
   );
 }
