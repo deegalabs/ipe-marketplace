@@ -6,9 +6,24 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   BASE_SEPOLIA_RPC: z.string().url().default('https://sepolia.base.org'),
   CHAIN_ID: z.coerce.number().default(84_532),
-  IPE_TOKEN_ADDRESS: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
-  USDC_TOKEN_ADDRESS: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
-  IPE_MARKET_ADDRESS: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+  /// Onchain addresses are optional in gateway-only deploys (the contract still
+  /// gets called for mintTo, but only when these are set). Endpoints that need
+  /// them (treasury, indexer, mintTo) check the addresses before running.
+  IPE_TOKEN_ADDRESS: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/)
+    .or(z.literal(''))
+    .default('0x0000000000000000000000000000000000000000'),
+  USDC_TOKEN_ADDRESS: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/)
+    .or(z.literal(''))
+    .default('0x0000000000000000000000000000000000000000'),
+  IPE_MARKET_ADDRESS: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/)
+    .or(z.literal(''))
+    .default('0x0000000000000000000000000000000000000000'),
   SHIPPING_ENCRYPTION_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/, 'must be 32-byte hex'),
   INDEXER_POLL_INTERVAL_MS: z.coerce.number().default(15_000),
   INDEXER_START_BLOCK: z.coerce.bigint().default(0n),
@@ -37,6 +52,21 @@ const envSchema = z.object({
   RESEND_FROM_EMAIL: z.string().default('IPE Store <orders@ipecity.example>'),
   /// Where admin-alert emails go. Empty = skip admin emails.
   ADMIN_NOTIFICATION_EMAIL: z.string().default(''),
+
+  /// Secret for signing admin session JWTs. Generate with `openssl rand -base64 48`.
+  /// Required in production; will fail boot if missing on a non-localhost DATABASE_URL.
+  ADMIN_JWT_SECRET: z.string().default(''),
+
+  /// On boot, if both are set and no admin with this email exists, create one.
+  /// Lets you bootstrap the first admin on a fresh deploy without a CLI step.
+  ADMIN_INITIAL_EMAIL: z.string().default(''),
+  ADMIN_INITIAL_PASSWORD: z.string().default(''),
+
+  /// Skip the chain event indexer (gateway-only deploys don't need it).
+  DISABLE_INDEXER: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
 });
 
 export const env = envSchema.parse(process.env);

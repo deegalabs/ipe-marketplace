@@ -5,8 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
+    "build": "echo 'no build step — runtime is tsx'",
+    "start": "tsx src/index.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "seed": "tsx src/scripts/seed.ts",
@@ -14,18 +14,22 @@
   },
   "dependencies": {
     "@ipe/shared": "*",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "drizzle-orm": "^0.39.3",
     "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3",
     "pg": "^8.16.3",
     "resend": "^4.8.0",
     "viem": "^2.31.4",
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "20.16.11",
     "@types/pg": "^8.15.4",
     "drizzle-kit": "^0.30.6",

@@ -1,12 +1,27 @@
 import { env } from './config';
+import { getAdminToken } from './lib/adminAuth';
 import type { CreateOrderInput, Rates, PaymentMethod, DeliveryMethod } from '@ipe/shared';
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${env.apiUrl}${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-  });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+interface RequestOpts extends RequestInit {
+  /// Attach the admin JWT from localStorage as Bearer.
+  admin?: boolean;
+}
+
+async function request<T>(path: string, init?: RequestOpts): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...((init?.headers as Record<string, string>) ?? {}),
+  };
+  if (init?.admin) {
+    const token = getAdminToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
+  const res = await fetch(`${env.apiUrl}${path}`, { ...init, headers });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: unknown };
+    const msg = typeof body.error === 'string' ? body.error : `${res.status} ${res.statusText}`;
+    throw new Error(msg);
+  }
   return res.json() as Promise<T>;
 }
 
@@ -66,11 +81,12 @@ export const api = {
   listProducts: () => request<ProductDTO[]>('/products'),
   getProduct: (id: string) => request<ProductDTO>(`/products/${id}`),
   createProduct: (body: unknown) =>
-    request<ProductDTO>('/products', { method: 'POST', body: JSON.stringify(body, replacer) }),
+    request<ProductDTO>('/products', { admin: true, method: 'POST', body: JSON.stringify(body, replacer) }),
   updateProduct: (id: string, body: unknown) =>
-    request<ProductDTO>(`/products/${id}`, { method: 'PATCH', body: JSON.stringify(body, replacer) }),
+    request<ProductDTO>(`/products/${id}`, { admin: true, method: 'PATCH', body: JSON.stringify(body, replacer) }),
   setProductTokenId: (id: string, tokenId: bigint) =>
     request<ProductDTO>(`/products/${id}/token`, {
+      admin: true,
       method: 'POST',
       body: JSON.stringify({ tokenId: tokenId.toString() }),
     }),
@@ -80,9 +96,9 @@ export const api = {
   ordersByBuyer: (address: string) =>
     request<OrderDTO[]>(`/orders/by-buyer/${address.toLowerCase()}`),
   getOrder: (id: string) => request<OrderDTO>(`/orders/${id}`),
-  adminOrders: () => request<OrderDTO[]>('/orders/admin'),
+  adminOrders: () => request<OrderDTO[]>('/orders/admin', { admin: true }),
   updateOrder: (id: string, body: { status?: string; trackingCode?: string }) =>
-    request<OrderDTO>(`/orders/admin/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    request<OrderDTO>(`/orders/admin/${id}`, { admin: true, method: 'PATCH', body: JSON.stringify(body) }),
 
   /// Gateway checkout (Mercado Pago PIX or NOWPayments crypto-gateway).
   createGatewayOrder: (input: {

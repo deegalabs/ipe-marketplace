@@ -10,6 +10,7 @@ import {
   sendOrderReadyForPickup,
   sendOrderDelivered,
 } from '../services/email.js';
+import { requireAdmin } from '../middleware/requireAdmin.js';
 
 export const ordersRouter = Router();
 
@@ -47,19 +48,6 @@ ordersRouter.post('/', async (req, res) => {
   res.status(201).json(serializeOrder(row!, false));
 });
 
-/// Public lookup for an order by id (used by the gateway flow to poll status while
-/// awaiting payment). Strips PII even if the requester is the buyer — intentional;
-/// PII is only visible to admin.
-ordersRouter.get('/:id', async (req, res) => {
-  // UUID validation before we hit the DB to avoid noisy errors on /by-buyer/...
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) {
-    return res.status(404).json({ error: 'not found' });
-  }
-  const row = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
-  if (!row) return res.status(404).json({ error: 'not found' });
-  res.json(serializeOrder(row, false));
-});
-
 ordersRouter.get('/by-buyer/:address', async (req, res) => {
   const rows = await db.query.orders.findMany({
     where: eq(schema.orders.buyerAddress, req.params.address.toLowerCase()),
@@ -68,7 +56,7 @@ ordersRouter.get('/by-buyer/:address', async (req, res) => {
   res.json(rows.map((r) => serializeOrder(r, false)));
 });
 
-ordersRouter.get('/admin', async (_req, res) => {
+ordersRouter.get('/admin', requireAdmin, async (_req, res) => {
   const rows = await db.query.orders.findMany({ orderBy: (o, { desc }) => desc(o.createdAt) });
   res.json(rows.map((r) => serializeOrder(r, true)));
 });
@@ -78,7 +66,7 @@ const patchSchema = z.object({
   trackingCode: z.string().max(120).optional(),
 });
 
-ordersRouter.patch('/admin/:id', async (req, res) => {
+ordersRouter.patch('/admin/:id', requireAdmin, async (req, res) => {
   const parsed = patchSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const [row] = await db
@@ -102,6 +90,18 @@ ordersRouter.patch('/admin/:id', async (req, res) => {
   }
 
   res.json(serializeOrder(row, true));
+});
+
+/// Public lookup for an order by id (used by the gateway flow to poll status while
+/// awaiting payment). Declared LAST so static segments like /admin and /by-buyer
+/// take precedence; the regex check is a defense in depth.
+ordersRouter.get('/:id', async (req, res) => {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) {
+    return res.status(404).json({ error: 'not found' });
+  }
+  const row = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
+  if (!row) return res.status(404).json({ error: 'not found' });
+  res.json(serializeOrder(row, false));
 });
 
 function priceFor(p: typeof schema.products.$inferSelect, method: 'ipe' | 'usdc'): bigint {

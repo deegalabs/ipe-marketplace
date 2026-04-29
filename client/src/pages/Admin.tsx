@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
+import { usePublicClient, useWriteContract } from 'wagmi';
 import { formatUnits, parseUnits, decodeEventLog, type Hex } from 'viem';
 import { IpeMarketAbi } from '@ipe/shared';
 import { api, type ProductDTO, type OrderDTO } from '../api';
@@ -8,22 +8,28 @@ import { env } from '../config';
 import { formatToken, formatBrl } from '../lib/format';
 import { normalizeImageUrl } from '../lib/imageUrl';
 import { useCurrency } from '../lib/currency';
+import { useAdminAuth } from '../lib/adminAuth';
 
 export function Admin() {
-  const { address } = useAccount();
-  const treasuryQ = useQuery({ queryKey: ['treasury'], queryFn: api.treasury, refetchInterval: 30_000 });
+  const { session, logout } = useAdminAuth();
+  const treasuryQ = useQuery({
+    queryKey: ['treasury'],
+    queryFn: api.treasury,
+    refetchInterval: 30_000,
+    // Treasury fetch hits chain — gracefully missing if contracts aren't deployed.
+    retry: false,
+  });
   const productsQ = useQuery({ queryKey: ['products'], queryFn: api.listProducts });
   const ordersQ = useQuery({ queryKey: ['admin-orders'], queryFn: api.adminOrders });
 
-  if (!address) return <p className="text-ipe-ink/60">Connect a wallet to access admin.</p>;
-
   return (
     <section className="space-y-10">
-      <header>
-        <h1 className="text-3xl font-bold text-ipe-green">Admin</h1>
-        <p className="text-sm text-ipe-ink/60">
-          PoC: any connected wallet sees this view. Wire `requireAdmin` middleware before mainnet.
-        </p>
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold text-ipe-green">Admin</h1>
+          <p className="text-sm text-ipe-ink/60">Signed in as {session?.email}</p>
+        </div>
+        <button onClick={logout} className="btn-ghost text-xs">Sign out</button>
       </header>
 
       <TreasuryCard data={treasuryQ.data} />

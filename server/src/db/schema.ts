@@ -87,3 +87,15 @@ export const indexerState = pgTable('indexer_state', {
   lastBlock: bigint('last_block', { mode: 'bigint' }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const adminUsers = pgTable('admin_users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: text('email').notNull().unique(),
+  /// bcrypt hash with cost factor 12.
+  passwordHash: text('password_hash').notNull(),
+  name: text('name').notNull().default(''),
+  /// Disable an admin without deleting the row, e.g. former staff.
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+});

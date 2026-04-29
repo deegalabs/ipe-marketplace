@@ -27,7 +27,14 @@ export function ProductPage() {
   const { writeContractAsync } = useWriteContract();
   const { currency, rates } = useCurrency();
 
-  const [paymentMethod, setPaymentMethod] = useState<'ipe' | 'usdc' | 'gateway'>('ipe');
+  // For the public launch, only gateway flow is exposed (PIX + crypto-via-NOWPayments).
+  // The direct onchain `buy()` path still works in the contract but is hidden in the UI
+  // because wallet/gas/network friction kills conversion. Flip this to true to bring it back.
+  const DIRECT_PAYMENTS_ENABLED = false;
+
+  const [paymentMethod, setPaymentMethod] = useState<'ipe' | 'usdc' | 'gateway'>(
+    DIRECT_PAYMENTS_ENABLED ? 'ipe' : 'gateway',
+  );
   const [delivery, setDelivery] = useState<'shipping' | 'pickup'>('pickup');
   const [showGateway, setShowGateway] = useState(false);
   const [shipping, setShipping] = useState<ShippingFormValues | null>(null);
@@ -40,8 +47,8 @@ export function ProductPage() {
   const tokenId = p.tokenId ? BigInt(p.tokenId) : null;
 
   const enabledMethods: ('ipe' | 'usdc' | 'gateway')[] = [
-    BigInt(p.priceIpe) > 0n ? 'ipe' : null,
-    BigInt(p.priceUsdc) > 0n ? 'usdc' : null,
+    DIRECT_PAYMENTS_ENABLED && BigInt(p.priceIpe) > 0n ? 'ipe' : null,
+    DIRECT_PAYMENTS_ENABLED && BigInt(p.priceUsdc) > 0n ? 'usdc' : null,
     // gateway = PIX (Mercado Pago) + crypto-gateway (NOWPayments). Always enabled
     // — the actual sub-method is chosen inside the modal.
     'gateway' as const,
@@ -133,7 +140,7 @@ export function ProductPage() {
       default:
         if (paymentMethod === 'ipe') return `Buy for ${formatToken(p.priceIpe, 'IPE')}`;
         if (paymentMethod === 'usdc') return `Buy for ${formatToken(p.priceUsdc, 'USDC')}`;
-        return 'Continue to payment';
+        return `Checkout — ${formatBrl(p.priceBrl)}`;
     }
   })();
 
@@ -153,14 +160,16 @@ export function ProductPage() {
           </p>
         ) : (
           <>
-            <PaymentSelector
-              value={paymentMethod}
-              onChange={setPaymentMethod}
-              enabled={enabledMethods}
-              priceIpe={p.priceIpe}
-              priceUsdc={p.priceUsdc}
-              priceBrl={p.priceBrl}
-            />
+            {enabledMethods.length > 1 && (
+              <PaymentSelector
+                value={paymentMethod}
+                onChange={setPaymentMethod}
+                enabled={enabledMethods}
+                priceIpe={p.priceIpe}
+                priceUsdc={p.priceUsdc}
+                priceBrl={p.priceBrl}
+              />
+            )}
             <DeliverySelector value={delivery} onChange={setDelivery} enabled={enabledDeliveries} />
             {delivery === 'shipping' && (
               <ShippingForm value={shipping} onChange={setShipping} />

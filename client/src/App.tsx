@@ -1,10 +1,12 @@
-import { Route, Switch, Link, useLocation } from 'wouter';
+import { Route, Switch, Link, useLocation, Redirect } from 'wouter';
 import { usePrivy } from '@privy-io/react-auth';
 import { Shop } from './pages/Shop';
 import { ProductPage } from './pages/Product';
 import { Orders } from './pages/Orders';
 import { Admin } from './pages/Admin';
+import { AdminLogin } from './pages/AdminLogin';
 import { CurrencyToggle } from './lib/currency';
+import { useAdminAuth } from './lib/adminAuth';
 import { InstallPrompt } from './components/InstallPrompt';
 
 export function App() {
@@ -16,7 +18,8 @@ export function App() {
           <Route path="/" component={Shop} />
           <Route path="/product/:id" component={ProductPage} />
           <Route path="/orders" component={Orders} />
-          <Route path="/admin" component={Admin} />
+          <Route path="/admin/login" component={AdminLogin} />
+          <Route path="/admin">{() => <AdminGate />}</Route>
           <Route>
             <p className="text-center text-ipe-ink/60">Page not found.</p>
           </Route>
@@ -82,6 +85,14 @@ function Header() {
       </div>
     </header>
   );
+}
+
+/// Redirects unauthenticated visitors to /admin/login. Renders the Admin
+/// dashboard when a session is present.
+function AdminGate() {
+  const { session } = useAdminAuth();
+  if (!session) return <Redirect to="/admin/login" />;
+  return <Admin />;
 }
 
 /// Native-feeling bottom nav for mobile. Hidden on desktop (≥sm) where the

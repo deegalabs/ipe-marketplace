@@ -7,6 +7,7 @@ import { baseSepolia } from 'viem/chains';
 import { App } from './App';
 import { env, wagmiConfig } from './config';
 import { CurrencyProvider } from './lib/currency';
+import { AdminAuthProvider } from './lib/adminAuth';
 import './styles.css';
 
 const queryClient = new QueryClient();
@@ -25,7 +26,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <WagmiProvider config={wagmiConfig}>
           <CurrencyProvider>
-            <App />
+            <AdminAuthProvider>
+              <App />
+            </AdminAuthProvider>
           </CurrencyProvider>
         </WagmiProvider>
       </QueryClientProvider>

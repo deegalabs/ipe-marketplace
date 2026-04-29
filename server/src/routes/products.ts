@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { productInputSchema } from '@ipe/shared';
 import { db, schema } from '../db/client.js';
 import { normalizeImageUrl } from '../lib/imageUrl.js';
+import { requireAdmin } from '../middleware/requireAdmin.js';
 
 export const productsRouter = Router();
 
@@ -17,14 +18,14 @@ productsRouter.get('/:id', async (req, res) => {
   res.json(serialize(row));
 });
 
-productsRouter.post('/', async (req, res) => {
+productsRouter.post('/', requireAdmin, async (req, res) => {
   const parsed = productInputSchema.safeParse(coerceInput(req.body));
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const [row] = await db.insert(schema.products).values(toRow(parsed.data) as never).returning();
   res.status(201).json(serialize(row!));
 });
 
-productsRouter.patch('/:id', async (req, res) => {
+productsRouter.patch('/:id', requireAdmin, async (req, res) => {
   const parsed = productInputSchema.partial().safeParse(coerceInput(req.body));
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const [row] = await db
@@ -49,7 +50,7 @@ function toRow<T extends Record<string, unknown>>(data: T): Record<string, unkno
   return out;
 }
 
-productsRouter.post('/:id/token', async (req, res) => {
+productsRouter.post('/:id/token', requireAdmin, async (req, res) => {
   const tokenId = BigInt(req.body?.tokenId);
   const [row] = await db
     .update(schema.products)
