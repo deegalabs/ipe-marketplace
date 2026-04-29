@@ -429,7 +429,7 @@ function OrdersCard({ orders, products }: { orders: OrderDTO[]; products: Produc
                   <div className="flex justify-between gap-2">
                     <div>
                       <p className="font-medium">{p?.name ?? '?'} ×{o.quantity}</p>
-                      <p className="text-xs text-ipe-ink/60 font-mono">{o.id.slice(0, 8)} · {o.buyerAddress.slice(0, 8)}…</p>
+                      <p className="text-xs text-ipe-ink/60 font-mono">{o.id.slice(0, 8)} · {o.buyerAddress ? `${o.buyerAddress.slice(0, 8)}…` : (o.customerEmail ?? '—')}</p>
                     </div>
                     <span className={`text-xs px-2 py-0.5 h-fit rounded ${badgeForStatus(o.status)}`}>{o.status}</span>
                   </div>
@@ -482,7 +482,7 @@ function OrdersCard({ orders, products }: { orders: OrderDTO[]; products: Produc
                     <tr key={o.id} className="border-t border-ipe-green/10 align-top">
                       <td className="py-2 font-mono text-xs">{o.id.slice(0, 8)}</td>
                       <td>{p?.name ?? '?'} ×{o.quantity}</td>
-                      <td className="font-mono text-xs">{o.buyerAddress.slice(0, 10)}…</td>
+                      <td className="font-mono text-xs">{o.buyerAddress ? `${o.buyerAddress.slice(0, 10)}…` : (o.customerEmail ?? '—')}</td>
                       <td className="uppercase text-xs">{o.paymentMethod}</td>
                       <td>{formatPaid(o)}</td>
                       <td className="text-xs">
@@ -534,5 +534,6 @@ function formatPaid(o: OrderDTO): string {
     case 'ipe': return formatToken(o.totalPaid, 'IPE');
     case 'usdc': return formatToken(o.totalPaid, 'USDC');
     case 'pix': return formatBrl(o.totalPaid);
+    case 'crypto-gateway': return `$${(Number(o.totalPaid) / 1e6).toFixed(2)} (crypto)`;
   }
 }

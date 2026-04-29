@@ -32,12 +32,17 @@ export interface ProductDTO {
 export interface OrderDTO {
   id: string;
   productId: string;
-  buyerAddress: string;
+  buyerAddress: string | null;
+  customerEmail: string | null;
   quantity: number;
   paymentMethod: PaymentMethod;
+  paymentProvider: 'direct' | 'mercadopago' | 'nowpayments';
   paymentTokenAddress: string | null;
   totalPaid: string;
   paymentRef: string | null;
+  externalCheckoutUrl: string | null;
+  pixQrCode: string | null;
+  pixQrCodeBase64: string | null;
   blockNumber: string | null;
   status: 'pending' | 'awaiting_payment' | 'paid' | 'shipped' | 'delivered' | 'refunded' | 'cancelled';
   deliveryMethod: DeliveryMethod;
@@ -74,9 +79,31 @@ export const api = {
     request<OrderDTO>('/orders', { method: 'POST', body: JSON.stringify(input, replacer) }),
   ordersByBuyer: (address: string) =>
     request<OrderDTO[]>(`/orders/by-buyer/${address.toLowerCase()}`),
+  getOrder: (id: string) => request<OrderDTO>(`/orders/${id}`),
   adminOrders: () => request<OrderDTO[]>('/orders/admin'),
   updateOrder: (id: string, body: { status?: string; trackingCode?: string }) =>
     request<OrderDTO>(`/orders/admin/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  /// Gateway checkout (Mercado Pago PIX or NOWPayments crypto-gateway).
+  createGatewayOrder: (input: {
+    productId: string;
+    customerEmail: string;
+    buyerAddress?: string;
+    quantity: number;
+    paymentMethod: 'pix' | 'crypto-gateway';
+    deliveryMethod: 'shipping' | 'pickup';
+    shippingAddress?: unknown;
+    pickup?: { eventId: string; displayName: string };
+  }) =>
+    request<{
+      orderId: string;
+      provider: 'mercadopago' | 'nowpayments';
+      pix?: { qrCode: string; qrCodeBase64: string; expiresAt: string | null };
+      checkoutUrl?: string;
+    }>('/orders/gateway', { method: 'POST', body: JSON.stringify(input) }),
+  /// Local-dev only — manually mark a gateway order as paid (simulates webhook).
+  devConfirmGatewayOrder: (id: string) =>
+    request<{ ok: true }>(`/orders/gateway/${id}/dev-confirm`, { method: 'POST' }),
 
   treasury: () => request<TreasuryDTO>('/treasury'),
   rates: () => request<Rates>('/rates'),

@@ -3,8 +3,11 @@ import { z } from 'zod';
 export const productCategoryEnum = z.enum(['t-shirt', 'hoodie', 'cup', 'cap', 'other']);
 export type ProductCategory = z.infer<typeof productCategoryEnum>;
 
-export const paymentMethodEnum = z.enum(['ipe', 'usdc', 'pix']);
+export const paymentMethodEnum = z.enum(['ipe', 'usdc', 'pix', 'crypto-gateway']);
 export type PaymentMethod = z.infer<typeof paymentMethodEnum>;
+
+export const paymentProviderEnum = z.enum(['direct', 'mercadopago', 'nowpayments']);
+export type PaymentProvider = z.infer<typeof paymentProviderEnum>;
 
 export const deliveryMethodEnum = z.enum(['shipping', 'pickup']);
 export type DeliveryMethod = z.infer<typeof deliveryMethodEnum>;
@@ -88,21 +91,26 @@ export type PickupInfo = z.infer<typeof pickupInfoSchema>;
 export const orderSchema = z.object({
   id: z.string().uuid(),
   productId: z.string().uuid(),
-  buyerAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+  /// Optional — null for gateway flows where the buyer didn't provide a wallet.
+  buyerAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).nullable(),
+  customerEmail: z.string().email().nullable(),
   quantity: z.number().int().positive(),
   paymentMethod: paymentMethodEnum,
-  /// Token contract address for crypto payments. Null for `pix`.
+  paymentProvider: paymentProviderEnum,
+  /// Token contract address for direct crypto payments.
   paymentTokenAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).nullable(),
-  /// Total paid in the chosen currency's smallest unit (wei / micro / cents).
   totalPaid: z.bigint(),
-  /// txHash for crypto, Asaas paymentId (or similar) for PIX.
+  /// txHash (direct), Mercado Pago paymentId (PIX), or NOWPayments invoiceId (gateway).
   paymentRef: z.string().nullable(),
+  /// NOWPayments hosted checkout URL (only set for crypto-gateway flows).
+  externalCheckoutUrl: z.string().url().nullable(),
+  /// Mercado Pago PIX payload (so the client can re-render the QR).
+  pixQrCode: z.string().nullable(),
+  pixQrCodeBase64: z.string().nullable(),
   blockNumber: z.bigint().nullable(),
   status: orderStatusEnum,
   deliveryMethod: deliveryMethodEnum,
-  /// Stored encrypted at rest; surfaced to admin only. Null when deliveryMethod = pickup.
   shippingAddress: shippingAddressSchema.nullable(),
-  /// Set when deliveryMethod = pickup.
   pickup: pickupInfoSchema.nullable(),
   trackingCode: z.string().max(120).nullable(),
   createdAt: z.date(),
@@ -110,14 +118,17 @@ export const orderSchema = z.object({
 });
 export type Order = z.infer<typeof orderSchema>;
 
-export const createOrderInputSchema = z
+/// POST /orders — used after a *direct onchain* purchase (buyer signed buy() themselves).
+/// The order is recorded as already paid via the indexer once the Purchased event lands.
+export const createDirectOrderInputSchema = z
   .object({
     productId: z.string().uuid(),
     buyerAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+    customerEmail: z.string().email().optional(),
     quantity: z.number().int().positive(),
-    paymentMethod: paymentMethodEnum,
-    paymentTokenAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).nullable(),
-    paymentRef: z.string().nullable(),
+    paymentMethod: z.enum(['ipe', 'usdc']),
+    paymentTokenAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+    paymentRef: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
     deliveryMethod: deliveryMethodEnum,
     shippingAddress: shippingAddressSchema.optional(),
     pickup: pickupInfoSchema.optional(),
@@ -128,7 +139,35 @@ export const createOrderInputSchema = z
   .refine((d) => d.deliveryMethod === 'shipping' || d.pickup, {
     message: 'pickup is required when deliveryMethod = pickup',
   });
-export type CreateOrderInput = z.infer<typeof createOrderInputSchema>;
+export type CreateDirectOrderInput = z.infer<typeof createDirectOrderInputSchema>;
+
+/// POST /orders/gateway — buyer pays via Mercado Pago (PIX) or NOWPayments (crypto).
+/// Email is required so we can deliver the receipt; wallet is optional. When provided,
+/// the backend mints the 1155 to it on payment confirmation; otherwise the order lives
+/// only in the DB.
+export const createGatewayOrderInputSchema = z
+  .object({
+    productId: z.string().uuid(),
+    customerEmail: z.string().email(),
+    buyerAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).optional(),
+    quantity: z.number().int().positive(),
+    /// 'pix' → Mercado Pago. 'crypto-gateway' → NOWPayments.
+    paymentMethod: z.enum(['pix', 'crypto-gateway']),
+    deliveryMethod: deliveryMethodEnum,
+    shippingAddress: shippingAddressSchema.optional(),
+    pickup: pickupInfoSchema.optional(),
+  })
+  .refine((d) => d.deliveryMethod === 'pickup' || d.shippingAddress, {
+    message: 'shippingAddress is required when deliveryMethod = shipping',
+  })
+  .refine((d) => d.deliveryMethod === 'shipping' || d.pickup, {
+    message: 'pickup is required when deliveryMethod = pickup',
+  });
+export type CreateGatewayOrderInput = z.infer<typeof createGatewayOrderInputSchema>;
+
+/// Backwards-compat alias used by older client code paths until they migrate.
+export const createOrderInputSchema = createDirectOrderInputSchema;
+export type CreateOrderInput = CreateDirectOrderInput;
 
 /// Fiat / token rates returned by GET /rates. All values are decimal strings
 /// (e.g. "5.30" for USD/BRL) — let the UI pick its own number formatting.

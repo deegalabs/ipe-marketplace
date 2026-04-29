@@ -10,6 +10,7 @@ import { priceDisplay, formatToken, formatBrl } from '../lib/format';
 import { useCurrency } from '../lib/currency';
 import { ShippingForm, type ShippingFormValues } from '../components/ShippingForm';
 import { PickupForm, type PickupFormValues } from '../components/PickupForm';
+import { GatewayCheckout } from '../components/GatewayCheckout';
 
 type Step = 'idle' | 'approving' | 'buying' | 'recording' | 'done';
 
@@ -26,8 +27,9 @@ export function ProductPage() {
   const { writeContractAsync } = useWriteContract();
   const { currency, rates } = useCurrency();
 
-  const [paymentMethod, setPaymentMethod] = useState<'ipe' | 'usdc' | 'pix'>('ipe');
+  const [paymentMethod, setPaymentMethod] = useState<'ipe' | 'usdc' | 'gateway'>('ipe');
   const [delivery, setDelivery] = useState<'shipping' | 'pickup'>('pickup');
+  const [showGateway, setShowGateway] = useState(false);
   const [shipping, setShipping] = useState<ShippingFormValues | null>(null);
   const [pickup, setPickup] = useState<PickupFormValues | null>(null);
   const [step, setStep] = useState<Step>('idle');
@@ -37,11 +39,13 @@ export function ProductPage() {
   const p = product;
   const tokenId = p.tokenId ? BigInt(p.tokenId) : null;
 
-  const enabledMethods: ('ipe' | 'usdc' | 'pix')[] = [
+  const enabledMethods: ('ipe' | 'usdc' | 'gateway')[] = [
     BigInt(p.priceIpe) > 0n ? 'ipe' : null,
     BigInt(p.priceUsdc) > 0n ? 'usdc' : null,
-    // PIX is wired in v0.3 — gate it once Asaas integration is in.
-  ].filter((x): x is 'ipe' | 'usdc' => !!x);
+    // gateway = PIX (Mercado Pago) + crypto-gateway (NOWPayments). Always enabled
+    // — the actual sub-method is chosen inside the modal.
+    'gateway' as const,
+  ].filter((x): x is 'ipe' | 'usdc' | 'gateway' => !!x);
   // Shipping is disabled globally for the launch (pickup-only). Each product can
   // still flag `shippingAvailable: true`, but the UI gates it until logistics are wired.
   const SHIPPING_GLOBALLY_ENABLED = false;
@@ -51,7 +55,11 @@ export function ProductPage() {
   ].filter((x): x is 'shipping' | 'pickup' => !!x);
 
   const deliveryReady = delivery === 'shipping' ? !!shipping : !!pickup;
-  const canSubmit = !!address && tokenId !== null && deliveryReady && enabledMethods.includes(paymentMethod);
+  const isGateway = paymentMethod === 'gateway';
+  // Gateway flow doesn't require wallet/onchain product — only delivery info.
+  const canSubmit = isGateway
+    ? deliveryReady
+    : !!address && tokenId !== null && deliveryReady && enabledMethods.includes(paymentMethod);
 
   async function buyCrypto(method: CryptoToken) {
     if (!address || !tokenId || !publicClient) return;
@@ -110,8 +118,8 @@ export function ProductPage() {
   }
 
   async function submit() {
-    if (paymentMethod === 'pix') {
-      setError('PIX is coming in v0.3 — pick IPE or USDC for now.');
+    if (paymentMethod === 'gateway') {
+      setShowGateway(true);
       return;
     }
     await buyCrypto(paymentMethod);
@@ -125,7 +133,7 @@ export function ProductPage() {
       default:
         if (paymentMethod === 'ipe') return `Buy for ${formatToken(p.priceIpe, 'IPE')}`;
         if (paymentMethod === 'usdc') return `Buy for ${formatToken(p.priceUsdc, 'USDC')}`;
-        return `Buy for ${formatBrl(p.priceBrl)}`;
+        return 'Continue to payment';
     }
   })();
 
@@ -139,13 +147,7 @@ export function ProductPage() {
           <p className="text-ipe-ink/70 mt-4 text-sm sm:text-base">{p.description}</p>
         </div>
 
-        {tokenId === null ? (
-          <p className="text-amber-700 text-sm">
-            This product hasn't been pushed onchain yet. Ask the admin.
-          </p>
-        ) : !address ? (
-          <p className="text-ipe-ink/60 text-sm">Connect your wallet to buy.</p>
-        ) : step === 'done' ? (
+        {step === 'done' ? (
           <p className="text-ipe-green font-medium">
             Purchase complete — your receipt is in <a href="/orders" className="underline">My orders</a>.
           </p>
@@ -167,11 +169,29 @@ export function ProductPage() {
               <PickupForm value={pickup} onChange={setPickup} />
             )}
 
+            {!isGateway && tokenId === null && (
+              <p className="text-amber-700 text-xs">
+                This product isn't onchain yet — pick "Pay with anything else" to checkout off-chain, or ask the admin to push it onchain.
+              </p>
+            )}
+            {!isGateway && tokenId !== null && !address && (
+              <p className="text-ipe-ink/60 text-xs">Connect your wallet to buy with {paymentMethod.toUpperCase()}.</p>
+            )}
             <button className="btn-primary w-full" disabled={!canSubmit || step !== 'idle'} onClick={submit}>
               {ctaLabel}
             </button>
             {error && <p className="text-red-700 text-sm">{error}</p>}
           </>
+        )}
+
+        {showGateway && (
+          <GatewayCheckout
+            product={p}
+            delivery={delivery}
+            shipping={shipping}
+            pickup={pickup}
+            onClose={() => setShowGateway(false)}
+          />
         )}
       </div>
     </article>
@@ -179,9 +199,9 @@ export function ProductPage() {
 }
 
 interface PaymentSelectorProps {
-  value: 'ipe' | 'usdc' | 'pix';
-  onChange: (v: 'ipe' | 'usdc' | 'pix') => void;
-  enabled: ('ipe' | 'usdc' | 'pix')[];
+  value: 'ipe' | 'usdc' | 'gateway';
+  onChange: (v: 'ipe' | 'usdc' | 'gateway') => void;
+  enabled: ('ipe' | 'usdc' | 'gateway')[];
   priceIpe: string;
   priceUsdc: string;
   priceBrl: string;
@@ -189,16 +209,16 @@ interface PaymentSelectorProps {
 
 function PaymentSelector({ value, onChange, enabled, priceIpe, priceUsdc, priceBrl }: PaymentSelectorProps) {
   const opts = [
-    { id: 'ipe' as const, label: 'IPE', price: BigInt(priceIpe) > 0n ? formatToken(priceIpe, 'IPE') : '—' },
-    { id: 'usdc' as const, label: 'USDC', price: BigInt(priceUsdc) > 0n ? formatToken(priceUsdc, 'USDC') : '—' },
-    { id: 'pix' as const, label: 'PIX', price: BigInt(priceBrl) > 0n ? formatBrl(priceBrl) : '—', soon: true },
+    { id: 'ipe' as const, label: 'IPE', sub: 'Direct onchain', price: BigInt(priceIpe) > 0n ? formatToken(priceIpe, 'IPE') : '—' },
+    { id: 'usdc' as const, label: 'USDC', sub: 'Direct onchain', price: BigInt(priceUsdc) > 0n ? formatToken(priceUsdc, 'USDC') : '—' },
+    { id: 'gateway' as const, label: 'Pay with anything else', sub: 'PIX or any crypto', price: BigInt(priceBrl) > 0n ? formatBrl(priceBrl) : '—' },
   ];
   return (
     <fieldset className="space-y-2">
       <legend className="label">Payment method</legend>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         {opts.map((o) => {
-          const disabled = !enabled.includes(o.id) || o.soon;
+          const disabled = !enabled.includes(o.id);
           return (
             <button
               key={o.id}
@@ -213,7 +233,7 @@ function PaymentSelector({ value, onChange, enabled, priceIpe, priceUsdc, priceB
             >
               <div className="font-medium">{o.label}</div>
               <div className="text-xs text-ipe-ink/70">{o.price}</div>
-              {o.soon && <div className="text-[10px] text-amber-700 mt-1">soon (v0.3)</div>}
+              <div className="text-[10px] text-ipe-ink/50 mt-0.5">{o.sub}</div>
             </button>
           );
         })}

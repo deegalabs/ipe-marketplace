@@ -1,14 +1,20 @@
 import { Router } from 'express';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { createOrderInputSchema, orderStatusEnum } from '@ipe/shared';
+import { createDirectOrderInputSchema, orderStatusEnum } from '@ipe/shared';
 import { db, schema } from '../db/client.js';
 import { encryptAddress, decryptAddress } from '../crypto.js';
+import {
+  sendAdminNewOrder,
+  sendOrderShipped,
+  sendOrderReadyForPickup,
+  sendOrderDelivered,
+} from '../services/email.js';
 
 export const ordersRouter = Router();
 
 ordersRouter.post('/', async (req, res) => {
-  const parsed = createOrderInputSchema.safeParse(req.body);
+  const parsed = createDirectOrderInputSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, parsed.data.productId) });
@@ -18,26 +24,40 @@ ordersRouter.post('/', async (req, res) => {
   if (unit === 0n) return res.status(400).json({ error: 'payment method not enabled for this product' });
   const totalPaid = unit * BigInt(parsed.data.quantity);
 
-  const initialStatus = parsed.data.paymentMethod === 'pix' ? 'awaiting_payment' : 'pending';
-
   const [row] = await db
     .insert(schema.orders)
     .values({
       productId: parsed.data.productId,
       buyerAddress: parsed.data.buyerAddress.toLowerCase(),
+      customerEmail: parsed.data.customerEmail ?? null,
       quantity: parsed.data.quantity,
       paymentMethod: parsed.data.paymentMethod,
-      paymentTokenAddress: parsed.data.paymentTokenAddress?.toLowerCase() ?? null,
+      paymentProvider: 'direct',
+      paymentTokenAddress: parsed.data.paymentTokenAddress.toLowerCase(),
       totalPaid: totalPaid.toString(),
       paymentRef: parsed.data.paymentRef,
-      status: initialStatus,
+      status: 'pending',
       deliveryMethod: parsed.data.deliveryMethod,
       shippingAddressEnc: parsed.data.shippingAddress ? encryptAddress(parsed.data.shippingAddress) : null,
       pickupEventId: parsed.data.pickup?.eventId ?? null,
       pickupDisplayName: parsed.data.pickup?.displayName ?? null,
     })
     .returning();
+  if (row) void sendAdminNewOrder(row, product);
   res.status(201).json(serializeOrder(row!, false));
+});
+
+/// Public lookup for an order by id (used by the gateway flow to poll status while
+/// awaiting payment). Strips PII even if the requester is the buyer — intentional;
+/// PII is only visible to admin.
+ordersRouter.get('/:id', async (req, res) => {
+  // UUID validation before we hit the DB to avoid noisy errors on /by-buyer/...
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) {
+    return res.status(404).json({ error: 'not found' });
+  }
+  const row = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
+  if (!row) return res.status(404).json({ error: 'not found' });
+  res.json(serializeOrder(row, false));
 });
 
 ordersRouter.get('/by-buyer/:address', async (req, res) => {
@@ -67,14 +87,27 @@ ordersRouter.patch('/admin/:id', async (req, res) => {
     .where(eq(schema.orders.id, req.params.id))
     .returning();
   if (!row) return res.status(404).json({ error: 'order not found' });
+
+  // Status transition emails (best-effort).
+  if (parsed.data.status) {
+    const product = await db.query.products.findFirst({ where: eq(schema.products.id, row.productId) });
+    if (product) {
+      if (parsed.data.status === 'shipped') {
+        if (row.deliveryMethod === 'pickup') void sendOrderReadyForPickup(row, product);
+        else void sendOrderShipped(row, product);
+      } else if (parsed.data.status === 'delivered') {
+        void sendOrderDelivered(row, product);
+      }
+    }
+  }
+
   res.json(serializeOrder(row, true));
 });
 
-function priceFor(p: typeof schema.products.$inferSelect, method: 'ipe' | 'usdc' | 'pix'): bigint {
+function priceFor(p: typeof schema.products.$inferSelect, method: 'ipe' | 'usdc'): bigint {
   switch (method) {
     case 'ipe': return BigInt(p.priceIpe);
     case 'usdc': return BigInt(p.priceUsdc);
-    case 'pix': return p.priceBrl;
   }
 }
 
@@ -83,11 +116,16 @@ function serializeOrder(o: typeof schema.orders.$inferSelect, includePII: boolea
     id: o.id,
     productId: o.productId,
     buyerAddress: o.buyerAddress,
+    customerEmail: includePII ? o.customerEmail : null,
     quantity: o.quantity,
     paymentMethod: o.paymentMethod,
+    paymentProvider: o.paymentProvider,
     paymentTokenAddress: o.paymentTokenAddress,
     totalPaid: o.totalPaid,
     paymentRef: o.paymentRef,
+    externalCheckoutUrl: o.externalCheckoutUrl,
+    pixQrCode: o.pixQrCode,
+    pixQrCodeBase64: o.pixQrCodeBase64,
     blockNumber: o.blockNumber?.toString() ?? null,
     status: o.status,
     deliveryMethod: o.deliveryMethod,

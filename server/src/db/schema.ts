@@ -11,7 +11,8 @@ export const orderStatus = pgEnum('order_status', [
   'refunded',
   'cancelled',
 ]);
-export const paymentMethod = pgEnum('payment_method', ['ipe', 'usdc', 'pix']);
+export const paymentMethod = pgEnum('payment_method', ['ipe', 'usdc', 'pix', 'crypto-gateway']);
+export const paymentProvider = pgEnum('payment_provider', ['direct', 'mercadopago', 'nowpayments']);
 export const deliveryMethod = pgEnum('delivery_method', ['shipping', 'pickup']);
 
 /// Helper for uint256-sized amounts that don't fit in Postgres BIGINT.
@@ -47,21 +48,33 @@ export const products = pgTable('products', {
 export const orders = pgTable('orders', {
   id: uuid('id').primaryKey().defaultRandom(),
   productId: uuid('product_id').notNull().references(() => products.id),
-  buyerAddress: text('buyer_address').notNull(),
+  /// Wallet that will hold the 1155 receipt. Optional for gateway flows where the
+  /// buyer didn't provide one — in that case the order is DB-only (no onchain mint).
+  buyerAddress: text('buyer_address'),
+  /// Email captured for gateway flows (required) or as opt-in receipt for direct buys.
+  customerEmail: text('customer_email'),
   quantity: integer('quantity').notNull(),
   paymentMethod: paymentMethod('payment_method').notNull(),
-  /// Token contract for crypto payments. Null for PIX.
+  /// 'direct' = buyer signed onchain. 'mercadopago' / 'nowpayments' = via gateway.
+  paymentProvider: paymentProvider('payment_provider').notNull().default('direct'),
+  /// Token contract for crypto direct payments. Null for PIX / crypto-gateway.
   paymentTokenAddress: text('payment_token_address'),
   /// Total paid in the chosen currency's smallest unit (numeric → string).
   totalPaid: uint256('total_paid').notNull(),
-  /// txHash for crypto, Asaas paymentId for PIX.
+  /// txHash for direct crypto. provider id (Mercado Pago paymentId / NOWPayments invoiceId)
+  /// for gateway flows.
   paymentRef: text('payment_ref'),
+  /// Provider-hosted checkout URL (NOWPayments) so the client can redirect.
+  externalCheckoutUrl: text('external_checkout_url'),
+  /// PIX QR payload (Mercado Pago). Stored so the client can re-render the QR if
+  /// the buyer reloads the page mid-payment.
+  pixQrCode: text('pix_qr_code'),
+  pixQrCodeBase64: text('pix_qr_code_base64'),
   blockNumber: bigint('block_number', { mode: 'bigint' }),
   status: orderStatus('status').notNull().default('pending'),
   deliveryMethod: deliveryMethod('delivery_method').notNull().default('shipping'),
   /// AES-256-GCM ciphertext (iv + tag + payload, base64). Decrypt with SHIPPING_ENCRYPTION_KEY.
   shippingAddressEnc: text('shipping_address_enc'),
-  /// Plaintext (no PII concern beyond display name + free-form event id).
   pickupEventId: text('pickup_event_id'),
   pickupDisplayName: text('pickup_display_name'),
   trackingCode: text('tracking_code'),

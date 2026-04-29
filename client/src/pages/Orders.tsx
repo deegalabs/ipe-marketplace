@@ -52,6 +52,7 @@ function formatPaid(o: { totalPaid: string; paymentMethod: string }): string {
     case 'ipe': return formatToken(o.totalPaid, 'IPE');
     case 'usdc': return formatToken(o.totalPaid, 'USDC');
     case 'pix': return formatBrl(o.totalPaid);
+    case 'crypto-gateway': return `$${(Number(o.totalPaid) / 1e6).toFixed(2)} (crypto)`;
     default: return o.totalPaid;
   }
 }
