@@ -1,0 +1,23 @@
+{
+  "name": "@ipe/shared",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./abi": "./src/abi/index.ts",
+    "./schema": "./src/schema.ts",
+    "./addresses": "./src/addresses.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "abi:sync": "node scripts/sync-abi.mjs"
+  },
+  "dependencies": {
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

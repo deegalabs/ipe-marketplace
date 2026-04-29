@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: theme('fontFamily.display');
+}
+
+.btn {
+  @apply inline-flex items-center justify-center px-4 py-2 rounded-md font-medium transition-colors;
+}
+.btn-primary {
+  @apply btn bg-ipe-green text-ipe-cream hover:bg-ipe-green/90 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+.btn-ghost {
+  @apply btn bg-transparent text-ipe-green border border-ipe-green hover:bg-ipe-green/5;
+}
+.card {
+  @apply bg-white rounded-lg shadow-sm border border-ipe-green/10 overflow-hidden;
+}
+.input {
+  @apply w-full px-3 py-2 rounded-md border border-ipe-green/20 bg-white focus:outline-none focus:ring-2 focus:ring-ipe-green/40;
+}
+.label {
+  @apply block text-sm font-medium text-ipe-ink mb-1;
+}
