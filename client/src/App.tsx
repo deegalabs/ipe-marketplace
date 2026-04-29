@@ -4,6 +4,7 @@ import { Shop } from './pages/Shop';
 import { ProductPage } from './pages/Product';
 import { Orders } from './pages/Orders';
 import { Admin } from './pages/Admin';
+import { CurrencyToggle } from './lib/currency';
 
 export function App() {
   return (
@@ -44,7 +45,8 @@ function Header() {
             <Link href="/admin" className="hover:text-ipe-green">Admin</Link>
           </nav>
         </div>
-        <div>
+        <div className="flex items-center gap-3">
+          <CurrencyToggle />
           {authenticated && wallet ? (
             <button onClick={() => logout()} className="btn-ghost text-xs">
               {wallet.slice(0, 6)}…{wallet.slice(-4)} · disconnect

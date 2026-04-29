@@ -3,6 +3,12 @@ import { z } from 'zod';
 export const productCategoryEnum = z.enum(['t-shirt', 'hoodie', 'cup', 'cap', 'other']);
 export type ProductCategory = z.infer<typeof productCategoryEnum>;
 
+export const paymentMethodEnum = z.enum(['ipe', 'usdc', 'pix']);
+export type PaymentMethod = z.infer<typeof paymentMethodEnum>;
+
+export const deliveryMethodEnum = z.enum(['shipping', 'pickup']);
+export type DeliveryMethod = z.infer<typeof deliveryMethodEnum>;
+
 /// A product as it lives in the off-chain catalog. `tokenId` is null until the
 /// admin pushes it onchain via listProduct().
 export const productSchema = z.object({
@@ -12,17 +18,24 @@ export const productSchema = z.object({
   description: z.string().max(2_000).default(''),
   category: productCategoryEnum,
   imageUrl: z.string().url(),
-  priceIpe: z.bigint(),               // smallest unit
-  maxSupply: z.bigint(),              // 0 = unlimited
+  /// Per-currency prices in smallest unit. priceBrl is fiat (cents — int with no decimal).
+  /// Setting a price to 0n disables that currency for this product.
+  priceIpe: z.bigint(),     // 18 decimals
+  priceUsdc: z.bigint(),    // 6 decimals
+  priceBrl: z.bigint(),     // BRL cents (e.g. 12500 = R$ 125,00)
+  maxSupply: z.bigint(),
   royaltyBps: z.number().int().min(0).max(1_000),
   active: z.boolean(),
   physicalStock: z.number().int().min(0),
+  /// When true, buyer picks up the item at an event (no shipping address required).
+  pickupAvailable: z.boolean(),
+  /// When true, buyer can ship the item to themselves (default).
+  shippingAvailable: z.boolean(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
 export type Product = z.infer<typeof productSchema>;
 
-/// What the admin POSTs to create / update a product (no derived fields).
 export const productInputSchema = productSchema
   .pick({
     name: true,
@@ -30,14 +43,26 @@ export const productInputSchema = productSchema
     category: true,
     imageUrl: true,
     priceIpe: true,
+    priceUsdc: true,
+    priceBrl: true,
     maxSupply: true,
     royaltyBps: true,
     physicalStock: true,
+    pickupAvailable: true,
+    shippingAvailable: true,
   })
   .extend({ active: z.boolean().default(true) });
 export type ProductInput = z.infer<typeof productInputSchema>;
 
-export const orderStatusEnum = z.enum(['pending', 'paid', 'shipped', 'delivered', 'refunded', 'cancelled']);
+export const orderStatusEnum = z.enum([
+  'pending',           // order recorded, payment not yet confirmed
+  'awaiting_payment',  // PIX QR generated, waiting for PSP webhook
+  'paid',              // payment confirmed (onchain or fiat)
+  'shipped',
+  'delivered',
+  'refunded',
+  'cancelled',
+]);
 export type OrderStatus = z.infer<typeof orderStatusEnum>;
 
 export const shippingAddressSchema = z.object({
@@ -47,33 +72,71 @@ export const shippingAddressSchema = z.object({
   city: z.string().min(1).max(120),
   state: z.string().min(1).max(60),
   postalCode: z.string().min(3).max(20),
-  country: z.string().length(2),       // ISO-3166-1 alpha-2
+  country: z.string().length(2),
   phone: z.string().max(40).optional(),
 });
 export type ShippingAddress = z.infer<typeof shippingAddressSchema>;
+
+export const pickupInfoSchema = z.object({
+  /// Free-form event identifier set by the admin per-product (e.g. "ipe-meetup-2026-05").
+  eventId: z.string().max(120),
+  /// Buyer-supplied display name for verification at pickup.
+  displayName: z.string().min(1).max(120),
+});
+export type PickupInfo = z.infer<typeof pickupInfoSchema>;
 
 export const orderSchema = z.object({
   id: z.string().uuid(),
   productId: z.string().uuid(),
   buyerAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
   quantity: z.number().int().positive(),
-  totalPaidIpe: z.bigint(),
-  txHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/).nullable(),
+  paymentMethod: paymentMethodEnum,
+  /// Token contract address for crypto payments. Null for `pix`.
+  paymentTokenAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).nullable(),
+  /// Total paid in the chosen currency's smallest unit (wei / micro / cents).
+  totalPaid: z.bigint(),
+  /// txHash for crypto, Asaas paymentId (or similar) for PIX.
+  paymentRef: z.string().nullable(),
   blockNumber: z.bigint().nullable(),
   status: orderStatusEnum,
-  /// Stored encrypted at rest; surfaced to admin only.
+  deliveryMethod: deliveryMethodEnum,
+  /// Stored encrypted at rest; surfaced to admin only. Null when deliveryMethod = pickup.
   shippingAddress: shippingAddressSchema.nullable(),
+  /// Set when deliveryMethod = pickup.
+  pickup: pickupInfoSchema.nullable(),
   trackingCode: z.string().max(120).nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
 export type Order = z.infer<typeof orderSchema>;
 
-export const createOrderInputSchema = z.object({
-  productId: z.string().uuid(),
-  buyerAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
-  quantity: z.number().int().positive(),
-  txHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
-  shippingAddress: shippingAddressSchema,
-});
+export const createOrderInputSchema = z
+  .object({
+    productId: z.string().uuid(),
+    buyerAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+    quantity: z.number().int().positive(),
+    paymentMethod: paymentMethodEnum,
+    paymentTokenAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).nullable(),
+    paymentRef: z.string().nullable(),
+    deliveryMethod: deliveryMethodEnum,
+    shippingAddress: shippingAddressSchema.optional(),
+    pickup: pickupInfoSchema.optional(),
+  })
+  .refine((d) => d.deliveryMethod === 'pickup' || d.shippingAddress, {
+    message: 'shippingAddress is required when deliveryMethod = shipping',
+  })
+  .refine((d) => d.deliveryMethod === 'shipping' || d.pickup, {
+    message: 'pickup is required when deliveryMethod = pickup',
+  });
 export type CreateOrderInput = z.infer<typeof createOrderInputSchema>;
+
+/// Fiat / token rates returned by GET /rates. All values are decimal strings
+/// (e.g. "5.30" for USD/BRL) — let the UI pick its own number formatting.
+export const ratesSchema = z.object({
+  ipeUsd: z.string().nullable(),
+  ipeBrl: z.string().nullable(),
+  usdcBrl: z.string().nullable(),  // ~ USD/BRL since USDC is pegged
+  fetchedAt: z.string(),           // ISO timestamp
+  source: z.string(),              // e.g. "coingecko" or "manual"
+});
+export type Rates = z.infer<typeof ratesSchema>;

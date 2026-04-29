@@ -23,24 +23,33 @@ async function tick() {
   const head = await publicClient.getBlockNumber();
   if (head < fromBlock) return;
 
-  const logs = await publicClient.getContractEvents({
-    address: ipeMarketAddress,
-    abi: IpeMarketAbi,
-    eventName: 'Purchased',
-    fromBlock,
-    toBlock: head,
-  });
+  // Both Purchased (crypto) and FiatMinted (PIX) flip an order from pending → paid.
+  // We listen to both and reconcile by paymentRef = txHash.
+  const [purchasedLogs, fiatMintedLogs] = await Promise.all([
+    publicClient.getContractEvents({
+      address: ipeMarketAddress,
+      abi: IpeMarketAbi,
+      eventName: 'Purchased',
+      fromBlock,
+      toBlock: head,
+    }),
+    publicClient.getContractEvents({
+      address: ipeMarketAddress,
+      abi: IpeMarketAbi,
+      eventName: 'FiatMinted',
+      fromBlock,
+      toBlock: head,
+    }),
+  ]);
 
-  for (const log of logs) {
+  for (const log of [...purchasedLogs, ...fiatMintedLogs]) {
     const txHash = log.transactionHash;
     if (!txHash) continue;
 
-    // Find the pending order matching this txHash and mark it paid.
-    // Buyers POST to /orders right after sending the tx, so the row likely already exists.
     const result = await db
       .update(schema.orders)
       .set({ status: 'paid', blockNumber: log.blockNumber, updatedAt: new Date() })
-      .where(and(eq(schema.orders.txHash, txHash), eq(schema.orders.status, 'pending')))
+      .where(and(eq(schema.orders.paymentRef, txHash), eq(schema.orders.status, 'pending')))
       .returning({ id: schema.orders.id });
 
     if (result.length > 0) {

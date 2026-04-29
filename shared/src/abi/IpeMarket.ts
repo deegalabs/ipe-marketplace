@@ -4,11 +4,6 @@ export const IpeMarketAbi = [
     "type": "constructor",
     "inputs": [
       {
-        "name": "paymentToken_",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "treasury_",
         "type": "address",
         "internalType": "address"
@@ -20,6 +15,25 @@ export const IpeMarketAbi = [
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "acceptedTokens",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -82,6 +96,11 @@ export const IpeMarketAbi = [
         "name": "qty",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "paymentToken",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -176,6 +195,11 @@ export const IpeMarketAbi = [
         "internalType": "uint256"
       },
       {
+        "name": "paymentToken",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "pricePerUnit",
         "type": "uint256",
         "internalType": "uint256"
@@ -195,11 +219,6 @@ export const IpeMarketAbi = [
     "name": "listProduct",
     "inputs": [
       {
-        "name": "price",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
         "name": "maxSupply",
         "type": "uint256",
         "internalType": "uint256"
@@ -213,6 +232,16 @@ export const IpeMarketAbi = [
         "name": "uri_",
         "type": "string",
         "internalType": "string"
+      },
+      {
+        "name": "tokens",
+        "type": "address[]",
+        "internalType": "address[]"
+      },
+      {
+        "name": "tokenPrices",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
       }
     ],
     "outputs": [
@@ -229,7 +258,7 @@ export const IpeMarketAbi = [
     "name": "listings",
     "inputs": [
       {
-        "name": "",
+        "name": "listingId",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -251,6 +280,11 @@ export const IpeMarketAbi = [
         "internalType": "uint256"
       },
       {
+        "name": "paymentToken",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "pricePerUnit",
         "type": "uint256",
         "internalType": "uint256"
@@ -262,6 +296,34 @@ export const IpeMarketAbi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "mintTo",
+    "inputs": [
+      {
+        "name": "buyer",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "productId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "qty",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "fiatRef",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -382,13 +444,24 @@ export const IpeMarketAbi = [
   },
   {
     "type": "function",
-    "name": "paymentToken",
-    "inputs": [],
+    "name": "prices",
+    "inputs": [
+      {
+        "name": "productId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "outputs": [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IERC20"
+        "name": "price",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -398,17 +471,12 @@ export const IpeMarketAbi = [
     "name": "products",
     "inputs": [
       {
-        "name": "",
+        "name": "productId",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
     "outputs": [
-      {
-        "name": "price",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
       {
         "name": "maxSupply",
         "type": "uint256",
@@ -554,6 +622,24 @@ export const IpeMarketAbi = [
   },
   {
     "type": "function",
+    "name": "setAcceptedToken",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "accepted",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setApprovalForAll",
     "inputs": [
       {
@@ -565,6 +651,29 @@ export const IpeMarketAbi = [
         "name": "approved",
         "type": "bool",
         "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setPrice",
+    "inputs": [
+      {
+        "name": "productId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "price",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -670,11 +779,6 @@ export const IpeMarketAbi = [
         "internalType": "uint256"
       },
       {
-        "name": "price",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
         "name": "active",
         "type": "bool",
         "internalType": "bool"
@@ -757,6 +861,37 @@ export const IpeMarketAbi = [
   },
   {
     "type": "event",
+    "name": "FiatMinted",
+    "inputs": [
+      {
+        "name": "buyer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "productId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "quantity",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "fiatRef",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "OwnershipTransferred",
     "inputs": [
       {
@@ -776,7 +911,7 @@ export const IpeMarketAbi = [
   },
   {
     "type": "event",
-    "name": "ProductListed",
+    "name": "PriceSet",
     "inputs": [
       {
         "name": "productId",
@@ -785,9 +920,28 @@ export const IpeMarketAbi = [
         "internalType": "uint256"
       },
       {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
         "name": "price",
         "type": "uint256",
         "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ProductListed",
+    "inputs": [
+      {
+        "name": "productId",
+        "type": "uint256",
+        "indexed": true,
         "internalType": "uint256"
       },
       {
@@ -819,12 +973,6 @@ export const IpeMarketAbi = [
         "name": "productId",
         "type": "uint256",
         "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "price",
-        "type": "uint256",
-        "indexed": false,
         "internalType": "uint256"
       },
       {
@@ -863,6 +1011,12 @@ export const IpeMarketAbi = [
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      },
+      {
+        "name": "paymentToken",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
       },
       {
         "name": "totalPaid",
@@ -940,6 +1094,12 @@ export const IpeMarketAbi = [
         "internalType": "uint256"
       },
       {
+        "name": "paymentToken",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
         "name": "pricePerUnit",
         "type": "uint256",
         "indexed": false,
@@ -981,6 +1141,25 @@ export const IpeMarketAbi = [
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "TokenAccepted",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "accepted",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
       }
     ],
     "anonymous": false
@@ -1305,7 +1484,17 @@ export const IpeMarketAbi = [
   },
   {
     "type": "error",
+    "name": "InvalidToken",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidTreasury",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "LengthMismatch",
     "inputs": []
   },
   {
@@ -1352,6 +1541,11 @@ export const IpeMarketAbi = [
   },
   {
     "type": "error",
+    "name": "PriceNotSetForToken",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "ProductInactive",
     "inputs": []
   },
@@ -1380,5 +1574,10 @@ export const IpeMarketAbi = [
         "internalType": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "TokenNotAccepted",
+    "inputs": []
   }
 ] as const;

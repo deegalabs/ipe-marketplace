@@ -12,6 +12,7 @@ mkdirSync(outDir, { recursive: true });
 const targets = [
   { name: 'IpeMarket', path: 'contracts/out/IpeMarket.sol/IpeMarket.json' },
   { name: 'MockIPE', path: 'contracts/out/MockIPE.sol/MockIPE.json' },
+  { name: 'MockUSDC', path: 'contracts/out/MockUSDC.sol/MockUSDC.json' },
 ];
 
 for (const { name, path } of targets) {

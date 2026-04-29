@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAccount } from 'wagmi';
 import { api } from '../api';
-import { formatIpe } from '../lib/format';
+import { formatToken, formatBrl } from '../lib/format';
 
 export function Orders() {
   const { address } = useAccount();
@@ -23,13 +23,17 @@ export function Orders() {
           <div key={o.id} className="card p-4 flex items-center justify-between">
             <div>
               <p className="text-sm font-mono text-ipe-ink/70">order {o.id.slice(0, 8)}</p>
-              <p>{o.quantity}× — {formatIpe(o.totalPaidIpe)}</p>
-              {o.txHash && (
+              <p>{o.quantity}× — {formatPaid(o)}</p>
+              <p className="text-xs text-ipe-ink/60">
+                via {o.paymentMethod.toUpperCase()} · {o.deliveryMethod}
+                {o.pickup ? ` (${o.pickup.eventId})` : ''}
+              </p>
+              {o.paymentRef && o.paymentMethod !== 'pix' && (
                 <a
                   className="text-xs underline text-ipe-green/70"
                   target="_blank"
                   rel="noreferrer"
-                  href={`https://sepolia.basescan.org/tx/${o.txHash}`}
+                  href={`https://sepolia.basescan.org/tx/${o.paymentRef}`}
                 >
                   view tx
                 </a>
@@ -43,9 +47,19 @@ export function Orders() {
   );
 }
 
+function formatPaid(o: { totalPaid: string; paymentMethod: string }): string {
+  switch (o.paymentMethod) {
+    case 'ipe': return formatToken(o.totalPaid, 'IPE');
+    case 'usdc': return formatToken(o.totalPaid, 'USDC');
+    case 'pix': return formatBrl(o.totalPaid);
+    default: return o.totalPaid;
+  }
+}
+
 function badgeColor(status: string) {
   switch (status) {
     case 'paid': return 'bg-blue-100 text-blue-800';
+    case 'awaiting_payment': return 'bg-purple-100 text-purple-800';
     case 'shipped': return 'bg-amber-100 text-amber-800';
     case 'delivered': return 'bg-green-100 text-green-800';
     case 'refunded':

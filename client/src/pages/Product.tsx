@@ -5,9 +5,13 @@ import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
 import { erc20Abi } from 'viem';
 import { IpeMarketAbi } from '@ipe/shared';
 import { api } from '../api';
-import { env } from '../config';
-import { formatIpe } from '../lib/format';
+import { env, TOKENS, type CryptoToken } from '../config';
+import { priceDisplay, formatToken, formatBrl } from '../lib/format';
+import { useCurrency } from '../lib/currency';
 import { ShippingForm, type ShippingFormValues } from '../components/ShippingForm';
+import { PickupForm, type PickupFormValues } from '../components/PickupForm';
+
+type Step = 'idle' | 'approving' | 'buying' | 'recording' | 'done';
 
 export function ProductPage() {
   const { id } = useParams();
@@ -20,23 +24,43 @@ export function ProductPage() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
-  const [step, setStep] = useState<'idle' | 'shipping' | 'approving' | 'buying' | 'recording' | 'done'>('idle');
-  const [error, setError] = useState<string | null>(null);
+  const { currency, rates } = useCurrency();
+
+  const [paymentMethod, setPaymentMethod] = useState<'ipe' | 'usdc' | 'pix'>('ipe');
+  const [delivery, setDelivery] = useState<'shipping' | 'pickup'>('shipping');
   const [shipping, setShipping] = useState<ShippingFormValues | null>(null);
+  const [pickup, setPickup] = useState<PickupFormValues | null>(null);
+  const [step, setStep] = useState<Step>('idle');
+  const [error, setError] = useState<string | null>(null);
 
   if (!product) return <p className="text-ipe-ink/60">Loading…</p>;
-  const loadedProduct = product;
-  const tokenId = loadedProduct.tokenId ? BigInt(loadedProduct.tokenId) : null;
+  const p = product;
+  const tokenId = p.tokenId ? BigInt(p.tokenId) : null;
 
-  async function buy() {
-    if (!address || !shipping || !tokenId || !publicClient) return;
+  const enabledMethods: ('ipe' | 'usdc' | 'pix')[] = [
+    BigInt(p.priceIpe) > 0n ? 'ipe' : null,
+    BigInt(p.priceUsdc) > 0n ? 'usdc' : null,
+    // PIX is wired in v0.3 — gate it once Asaas integration is in.
+  ].filter((x): x is 'ipe' | 'usdc' => !!x);
+  const enabledDeliveries: ('shipping' | 'pickup')[] = [
+    p.shippingAvailable ? 'shipping' : null,
+    p.pickupAvailable ? 'pickup' : null,
+  ].filter((x): x is 'shipping' | 'pickup' => !!x);
+
+  const deliveryReady = delivery === 'shipping' ? !!shipping : !!pickup;
+  const canSubmit = !!address && tokenId !== null && deliveryReady && enabledMethods.includes(paymentMethod);
+
+  async function buyCrypto(method: CryptoToken) {
+    if (!address || !tokenId || !publicClient) return;
     setError(null);
+    const token = TOKENS[method];
+    const tokenAddress = token.address();
+    const unit = method === 'ipe' ? BigInt(p.priceIpe) : BigInt(p.priceUsdc);
+    const totalPrice = unit; // qty = 1 in PoC
 
-    const totalPrice = BigInt(loadedProduct.priceIpe);
     try {
-      // 1. ensure allowance
       const allowance = (await publicClient.readContract({
-        address: env.ipeToken,
+        address: tokenAddress,
         abi: erc20Abi,
         functionName: 'allowance',
         args: [address, env.ipeMarket],
@@ -45,7 +69,7 @@ export function ProductPage() {
       if (allowance < totalPrice) {
         setStep('approving');
         const approveHash = await writeContractAsync({
-          address: env.ipeToken,
+          address: tokenAddress,
           abi: erc20Abi,
           functionName: 'approve',
           args: [env.ipeMarket, totalPrice],
@@ -53,24 +77,26 @@ export function ProductPage() {
         await publicClient.waitForTransactionReceipt({ hash: approveHash });
       }
 
-      // 2. buy
       setStep('buying');
       const buyHash = await writeContractAsync({
         address: env.ipeMarket,
         abi: IpeMarketAbi,
         functionName: 'buy',
-        args: [tokenId, 1n],
+        args: [tokenId, 1n, tokenAddress],
       });
       await publicClient.waitForTransactionReceipt({ hash: buyHash });
 
-      // 3. record off-chain order with shipping
       setStep('recording');
       await api.createOrder({
-        productId: loadedProduct.id,
+        productId: p.id,
         buyerAddress: address,
         quantity: 1,
-        txHash: buyHash,
-        shippingAddress: shipping,
+        paymentMethod: method,
+        paymentTokenAddress: tokenAddress,
+        paymentRef: buyHash,
+        deliveryMethod: delivery,
+        shippingAddress: delivery === 'shipping' ? shipping ?? undefined : undefined,
+        pickup: delivery === 'pickup' ? pickup ?? undefined : undefined,
       });
       setStep('done');
     } catch (err) {
@@ -80,44 +106,153 @@ export function ProductPage() {
     }
   }
 
+  async function submit() {
+    if (paymentMethod === 'pix') {
+      setError('PIX is coming in v0.3 — pick IPE or USDC for now.');
+      return;
+    }
+    await buyCrypto(paymentMethod);
+  }
+
+  const ctaLabel = (() => {
+    switch (step) {
+      case 'approving': return `Approving ${paymentMethod.toUpperCase()}…`;
+      case 'buying': return 'Submitting purchase…';
+      case 'recording': return 'Recording order…';
+      default:
+        if (paymentMethod === 'ipe') return `Buy for ${formatToken(p.priceIpe, 'IPE')}`;
+        if (paymentMethod === 'usdc') return `Buy for ${formatToken(p.priceUsdc, 'USDC')}`;
+        return `Buy for ${formatBrl(p.priceBrl)}`;
+    }
+  })();
+
   return (
     <article className="grid md:grid-cols-2 gap-8">
-      <img src={loadedProduct.imageUrl} alt={loadedProduct.name} className="card aspect-square object-cover" />
-      <div>
-        <h1 className="text-3xl font-bold text-ipe-green">{loadedProduct.name}</h1>
-        <p className="text-xl mt-2">{formatIpe(loadedProduct.priceIpe)}</p>
-        <p className="text-ipe-ink/70 mt-4">{loadedProduct.description}</p>
+      <img src={p.imageUrl} alt={p.name} className="card aspect-square object-cover" />
+      <div className="space-y-5">
+        <div>
+          <h1 className="text-3xl font-bold text-ipe-green">{p.name}</h1>
+          <p className="text-xl mt-2">{priceDisplay(p, currency, rates)}</p>
+          <p className="text-ipe-ink/70 mt-4">{p.description}</p>
+        </div>
 
         {tokenId === null ? (
-          <p className="mt-6 text-amber-700 text-sm">
-            This product hasn't been pushed onchain yet. Ask the admin to call <code>listProduct</code>.
+          <p className="text-amber-700 text-sm">
+            This product hasn't been pushed onchain yet. Ask the admin.
           </p>
         ) : !address ? (
-          <p className="mt-6 text-ipe-ink/60 text-sm">Connect your wallet to buy.</p>
+          <p className="text-ipe-ink/60 text-sm">Connect your wallet to buy.</p>
         ) : step === 'done' ? (
-          <p className="mt-6 text-ipe-green font-medium">
+          <p className="text-ipe-green font-medium">
             Purchase complete — your receipt is in <a href="/orders" className="underline">My orders</a>.
           </p>
         ) : (
-          <div className="mt-6 space-y-4">
-            <ShippingForm value={shipping} onChange={(v) => { setShipping(v); setStep('shipping'); }} />
-            <button
-              className="btn-primary w-full"
-              disabled={!shipping || step === 'approving' || step === 'buying' || step === 'recording'}
-              onClick={buy}
-            >
-              {step === 'approving'
-                ? 'Approving IPE…'
-                : step === 'buying'
-                  ? 'Submitting purchase…'
-                  : step === 'recording'
-                    ? 'Recording order…'
-                    : `Buy for ${formatIpe(loadedProduct.priceIpe)}`}
+          <>
+            <PaymentSelector
+              value={paymentMethod}
+              onChange={setPaymentMethod}
+              enabled={enabledMethods}
+              priceIpe={p.priceIpe}
+              priceUsdc={p.priceUsdc}
+              priceBrl={p.priceBrl}
+            />
+            <DeliverySelector value={delivery} onChange={setDelivery} enabled={enabledDeliveries} />
+            {delivery === 'shipping' && (
+              <ShippingForm value={shipping} onChange={setShipping} />
+            )}
+            {delivery === 'pickup' && (
+              <PickupForm value={pickup} onChange={setPickup} />
+            )}
+
+            <button className="btn-primary w-full" disabled={!canSubmit || step !== 'idle'} onClick={submit}>
+              {ctaLabel}
             </button>
             {error && <p className="text-red-700 text-sm">{error}</p>}
-          </div>
+          </>
         )}
       </div>
     </article>
+  );
+}
+
+interface PaymentSelectorProps {
+  value: 'ipe' | 'usdc' | 'pix';
+  onChange: (v: 'ipe' | 'usdc' | 'pix') => void;
+  enabled: ('ipe' | 'usdc' | 'pix')[];
+  priceIpe: string;
+  priceUsdc: string;
+  priceBrl: string;
+}
+
+function PaymentSelector({ value, onChange, enabled, priceIpe, priceUsdc, priceBrl }: PaymentSelectorProps) {
+  const opts = [
+    { id: 'ipe' as const, label: 'IPE', price: BigInt(priceIpe) > 0n ? formatToken(priceIpe, 'IPE') : '—' },
+    { id: 'usdc' as const, label: 'USDC', price: BigInt(priceUsdc) > 0n ? formatToken(priceUsdc, 'USDC') : '—' },
+    { id: 'pix' as const, label: 'PIX', price: BigInt(priceBrl) > 0n ? formatBrl(priceBrl) : '—', soon: true },
+  ];
+  return (
+    <fieldset className="space-y-2">
+      <legend className="label">Payment method</legend>
+      <div className="grid grid-cols-3 gap-2">
+        {opts.map((o) => {
+          const disabled = !enabled.includes(o.id) || o.soon;
+          return (
+            <button
+              key={o.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(o.id)}
+              className={`p-3 rounded-md border text-left ${
+                value === o.id
+                  ? 'border-ipe-green bg-ipe-green/5'
+                  : 'border-ipe-green/20 hover:border-ipe-green/40'
+              } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              <div className="font-medium">{o.label}</div>
+              <div className="text-xs text-ipe-ink/70">{o.price}</div>
+              {o.soon && <div className="text-[10px] text-amber-700 mt-1">soon (v0.3)</div>}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+function DeliverySelector({
+  value, onChange, enabled,
+}: {
+  value: 'shipping' | 'pickup';
+  onChange: (v: 'shipping' | 'pickup') => void;
+  enabled: ('shipping' | 'pickup')[];
+}) {
+  return (
+    <fieldset className="space-y-2">
+      <legend className="label">Delivery</legend>
+      <div className="grid grid-cols-2 gap-2">
+        {([
+          { id: 'shipping' as const, label: 'Ship to me', desc: 'Shipping address required' },
+          { id: 'pickup' as const, label: 'Pick up at event', desc: 'Show your receipt at the event' },
+        ]).map((o) => {
+          const disabled = !enabled.includes(o.id);
+          return (
+            <button
+              key={o.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(o.id)}
+              className={`p-3 rounded-md border text-left ${
+                value === o.id
+                  ? 'border-ipe-green bg-ipe-green/5'
+                  : 'border-ipe-green/20 hover:border-ipe-green/40'
+              } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              <div className="font-medium">{o.label}</div>
+              <div className="text-xs text-ipe-ink/70">{o.desc}</div>
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }

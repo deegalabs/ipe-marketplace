@@ -9,3 +9,4 @@ export const publicClient = createPublicClient({
 
 export const ipeMarketAddress = env.IPE_MARKET_ADDRESS as `0x${string}`;
 export const ipeTokenAddress = env.IPE_TOKEN_ADDRESS as `0x${string}`;
+export const usdcTokenAddress = env.USDC_TOKEN_ADDRESS as `0x${string}`;

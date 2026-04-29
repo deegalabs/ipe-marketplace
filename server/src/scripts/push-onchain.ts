@@ -1,9 +1,10 @@
 /**
  * Pushes every off-chain product (where tokenId is null) onchain by calling
- * IpeMarket.listProduct, then updates the DB with the resulting tokenId.
+ * IpeMarket.listProduct with all enabled per-currency prices, then updates
+ * the DB with the resulting tokenId.
  *
- * Reads DEPLOYER_PRIVATE_KEY from env — only the contract owner can list products.
- * Useful for local dev / re-seeding after a fresh deploy without touching the UI.
+ * The contract only stores ERC-20 prices (IPE, USDC). priceBrl stays off-chain
+ * for the v0.3 PIX flow.
  */
 import 'dotenv/config';
 import { isNull, eq } from 'drizzle-orm';
@@ -21,9 +22,7 @@ import { db, schema } from '../db/client.js';
 import { env } from '../env.js';
 
 const deployerKey = process.env.DEPLOYER_PRIVATE_KEY;
-if (!deployerKey) {
-  throw new Error('DEPLOYER_PRIVATE_KEY is required');
-}
+if (!deployerKey) throw new Error('DEPLOYER_PRIVATE_KEY is required');
 
 const account = privateKeyToAccount(deployerKey as Hex);
 const transport = http(env.BASE_SEPOLIA_RPC);
@@ -38,12 +37,30 @@ async function main() {
   }
 
   for (const p of pending) {
-    console.log(`[push-onchain] listing "${p.name}" (price ${p.priceIpe})…`);
+    const tokens: `0x${string}`[] = [];
+    const prices: bigint[] = [];
+    const priceIpe = BigInt(p.priceIpe);
+    const priceUsdc = BigInt(p.priceUsdc);
+    if (priceIpe > 0n) {
+      tokens.push(env.IPE_TOKEN_ADDRESS as `0x${string}`);
+      prices.push(priceIpe);
+    }
+    if (priceUsdc > 0n) {
+      tokens.push(env.USDC_TOKEN_ADDRESS as `0x${string}`);
+      prices.push(priceUsdc);
+    }
+    if (tokens.length === 0) {
+      console.warn(`[push-onchain] "${p.name}" has no crypto prices set, skipping`);
+      continue;
+    }
+
+    console.log(`[push-onchain] listing "${p.name}" with ${tokens.length} accepted token(s)…`);
+    const maxSupply = BigInt(p.maxSupply);
     const hash = await walletClient.writeContract({
       address: env.IPE_MARKET_ADDRESS as Hex,
       abi: IpeMarketAbi,
       functionName: 'listProduct',
-      args: [p.priceIpe, p.maxSupply, BigInt(p.royaltyBps), p.imageUrl],
+      args: [maxSupply, BigInt(p.royaltyBps), p.imageUrl, tokens, prices],
     });
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
@@ -58,7 +75,7 @@ async function main() {
       } catch { /* skip non-matching logs */ }
     }
     if (tokenId === null) {
-      console.warn(`[push-onchain] could not extract tokenId for "${p.name}" — skipping DB update`);
+      console.warn(`[push-onchain] could not extract tokenId for "${p.name}"`);
       continue;
     }
 

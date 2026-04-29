@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { api } from '../api';
-import { formatIpe } from '../lib/format';
+import { priceDisplay } from '../lib/format';
+import { useCurrency } from '../lib/currency';
 
 export function Shop() {
   const { data, isLoading, error } = useQuery({ queryKey: ['products'], queryFn: api.listProducts });
+  const { currency, rates } = useCurrency();
 
   if (isLoading) return <p className="text-ipe-ink/60">Loading shop…</p>;
   if (error) return <p className="text-red-700">Failed to load products.</p>;
@@ -19,10 +21,18 @@ export function Shop() {
             <img src={p.imageUrl} alt={p.name} className="aspect-square object-cover w-full" />
             <div className="p-3">
               <p className="font-medium">{p.name}</p>
-              <p className="text-sm text-ipe-ink/70">{formatIpe(p.priceIpe)}</p>
-              {p.tokenId === null && (
-                <p className="text-xs text-amber-700 mt-1">Not yet onchain</p>
-              )}
+              <p className="text-sm text-ipe-ink/70">{priceDisplay(p, currency, rates)}</p>
+              <div className="flex items-center gap-1 mt-2 flex-wrap">
+                {p.tokenId === null && (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">offline</span>
+                )}
+                {p.shippingAvailable && (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-ipe-green/10 text-ipe-green">ship</span>
+                )}
+                {p.pickupAvailable && (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-ipe-green/10 text-ipe-green">pickup</span>
+                )}
+              </div>
             </div>
           </Link>
         ))}

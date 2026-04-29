@@ -1,5 +1,5 @@
 import { env } from './config';
-import type { CreateOrderInput } from '@ipe/shared';
+import type { CreateOrderInput, Rates, PaymentMethod, DeliveryMethod } from '@ipe/shared';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${env.apiUrl}${path}`, {
@@ -17,11 +17,16 @@ export interface ProductDTO {
   description: string;
   category: string;
   imageUrl: string;
+  /// Smallest-unit prices as strings (since they may exceed Number.MAX_SAFE_INTEGER).
   priceIpe: string;
+  priceUsdc: string;
+  priceBrl: string;     // BRL cents
   maxSupply: string;
   royaltyBps: number;
   active: boolean;
   physicalStock: number;
+  pickupAvailable: boolean;
+  shippingAvailable: boolean;
 }
 
 export interface OrderDTO {
@@ -29,13 +34,27 @@ export interface OrderDTO {
   productId: string;
   buyerAddress: string;
   quantity: number;
-  totalPaidIpe: string;
-  txHash: string | null;
+  paymentMethod: PaymentMethod;
+  paymentTokenAddress: string | null;
+  totalPaid: string;
+  paymentRef: string | null;
   blockNumber: string | null;
-  status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'refunded' | 'cancelled';
+  status: 'pending' | 'awaiting_payment' | 'paid' | 'shipped' | 'delivered' | 'refunded' | 'cancelled';
+  deliveryMethod: DeliveryMethod;
+  shippingAddress: unknown;
+  pickup: { eventId: string; displayName: string } | null;
   trackingCode: string | null;
-  shippingAddress?: unknown;
   createdAt: string;
+}
+
+export interface TreasuryDTO {
+  treasuryAddress: string;
+  balances: Array<{
+    symbol: string;
+    decimals: number;
+    location: 'treasury' | 'contract';
+    balance: string;
+  }>;
 }
 
 export const api = {
@@ -59,10 +78,8 @@ export const api = {
   updateOrder: (id: string, body: { status?: string; trackingCode?: string }) =>
     request<OrderDTO>(`/orders/admin/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
-  treasury: () =>
-    request<{ treasuryAddress: string; treasuryBalanceIpe: string; marketContractBalanceIpe: string }>(
-      '/treasury',
-    ),
+  treasury: () => request<TreasuryDTO>('/treasury'),
+  rates: () => request<Rates>('/rates'),
 };
 
 function replacer(_key: string, value: unknown) {
