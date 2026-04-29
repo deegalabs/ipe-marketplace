@@ -3,26 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "description": "Onchain marketplace on Base for ipê.city merch — paid in $IPE, receipts as ERC-1155.",
-  "workspaces": [
-    "client",
-    "server",
-    "shared"
-  ],
   "scripts": {
-    "dev": "npm-run-all --parallel dev:server dev:client",
-    "dev:client": "npm --workspace client run dev",
-    "dev:server": "npm --workspace server run dev",
-    "build": "npm --workspace shared run build && npm --workspace client run build && npm --workspace server run build",
+    "dev": "pnpm --parallel --filter @ipe/client --filter @ipe/server dev",
+    "dev:client": "pnpm --filter @ipe/client dev",
+    "dev:server": "pnpm --filter @ipe/server dev",
+    "build": "pnpm --filter @ipe/shared build && pnpm --filter @ipe/client build && pnpm --filter @ipe/server build",
     "contracts:build": "cd contracts && forge build",
     "contracts:test": "cd contracts && forge test -vv",
     "contracts:deploy:sepolia": "cd contracts && forge script script/Deploy.s.sol --rpc-url $BASE_SEPOLIA_RPC --broadcast --verify",
-    "db:push": "npm --workspace server run db:push",
-    "seed": "npm --workspace server run seed",
-    "push-onchain": "npm --workspace server run push-onchain"
+    "db:push": "pnpm --filter @ipe/server db:push",
+    "seed": "pnpm --filter @ipe/server seed",
+    "push-onchain": "pnpm --filter @ipe/server push-onchain"
   },
   "devDependencies": {
-    "drizzle-orm": "^0.39.3",
-    "npm-run-all": "^4.1.5",
     "typescript": "^5.6.3"
-  }
+  },
+  "packageManager": "pnpm@10.33.2+sha512.a90faf6feeab71ad6c6e57f94e0fe1a12f5dcc22cd754db40ae9593eb6a3e0b6b12e3540218bb37ae083404b1f2ce6db2a4121e979829b4aff94b99f49da1cf8"
 }

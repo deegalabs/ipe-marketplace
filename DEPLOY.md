@@ -59,7 +59,7 @@ Direct onchain (`buy()` on `IpeMarket`) still works in the contract — flip `DI
 From your local machine, with the Supabase URL in `server/.env`:
 
 ```bash
-npm run db:push
+pnpm db:push
 ```
 
 This creates all tables on Supabase. You can re-run it any time after schema changes.
@@ -69,7 +69,7 @@ This creates all tables on Supabase. You can re-run it any time after schema cha
 ### a. Create the service
 
 1. https://railway.com/new → **Deploy from GitHub repo** → pick this repo.
-2. Railway reads `railway.json` (in the repo root), uses Railpack to build. The default start command runs `npm --workspace server run start`.
+2. Railway reads `railway.json` (in the repo root). Railpack auto-detects pnpm from `pnpm-lock.yaml`, runs `pnpm install`, then starts `pnpm --filter @ipe/server start`.
 3. The service spins up but will crash without env vars. That's expected — set them next.
 
 ### b. Required env vars on Railway
@@ -203,8 +203,8 @@ If you see `{"ok":true}`, the bootstrap admin was created on first boot — chec
 
 ## When you're ready for direct onchain payments
 
-1. Deploy contracts to Base Sepolia or mainnet (`npm run contracts:deploy:sepolia` after filling `.env` locally).
-2. Run `npm run push-onchain` to list existing products onchain (calls `IpeMarket.listProduct`).
+1. Deploy contracts to Base Sepolia or mainnet (`pnpm contracts:deploy:sepolia` after filling `.env` locally).
+2. Run `pnpm push-onchain` to list existing products onchain (calls `IpeMarket.listProduct`).
 3. Set `VITE_IPE_TOKEN_ADDRESS` / `VITE_USDC_TOKEN_ADDRESS` / `VITE_IPE_MARKET_ADDRESS` in Vercel.
 4. Set the same on Railway as `IPE_TOKEN_ADDRESS` etc.
 5. Set `DISABLE_INDEXER=false` on Railway so chain events reconcile direct purchases.

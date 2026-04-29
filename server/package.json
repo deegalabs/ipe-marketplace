@@ -13,7 +13,7 @@
     "push-onchain": "tsx src/scripts/push-onchain.ts"
   },
   "dependencies": {
-    "@ipe/shared": "*",
+    "@ipe/shared": "workspace:*",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
@@ -29,6 +29,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "4.17.21",
+    "@types/express-serve-static-core": "^4.19.8",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "20.16.11",
     "@types/pg": "^8.15.4",

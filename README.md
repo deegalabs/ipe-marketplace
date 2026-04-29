@@ -1,119 +1,101 @@
-# ipê.city Marketplace
+# IPE Store
 
-Onchain marketplace on **Base** for community merch (t-shirt, hoodie, cup, cap). Payment in **$IPE**, receipts as **ERC-1155**, with royalties (ERC-2981) and internal resale.
+Onchain merch marketplace on **Base** for the ipê.city community. Payment in **$IPE**, **USDC**, **PIX** (Mercado Pago) or any **crypto** (NOWPayments). Receipts as **ERC-1155** with royalties (ERC-2981) and an internal resale book.
 
-> See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full picture, PoC scope and roadmap.
+> See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full picture, [`DEPLOY.md`](./DEPLOY.md) for the production setup.
 
 ## Layout
 
 ```
-contracts/   Foundry — MockIPE + IpeMarket
+contracts/   Foundry — IpeMarket + MockIPE + MockUSDC
 shared/      zod schemas + ABIs + addresses (consumed by client + server)
-server/      Express + Drizzle + viem indexer
-client/      Vite + React + Privy + wagmi
+server/      Express + Drizzle + Resend + Mercado Pago + NOWPayments + chain indexer
+client/      Vite + React + Privy + wagmi + PWA (mobile-first)
 ```
 
 ## Prereqs
 
-- Node 20+
-- Postgres 14+ (or Docker)
-- [Foundry](https://book.getfoundry.sh) (forge / cast / anvil)
-- A funded deployer key on **Base Sepolia** (faucet: https://www.alchemy.com/faucets/base-sepolia)
-- A [Privy](https://privy.io) app id (free tier)
+- **Node 20+** with **pnpm** (auto-installed via corepack: `corepack enable`)
+- **Postgres 14+** (or Docker — see step 1 below)
+- [**Foundry**](https://book.getfoundry.sh) for contract dev (forge / cast / anvil)
+- A [**Privy**](https://privy.io) app id (free tier)
 
-## End-to-end run (Base Sepolia)
+## Local dev
 
-### 1. Install
+### 1. Database
 
 ```bash
-npm install
+docker run -d --name ipe-marketplace-pg -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=ipe_marketplace -p 55432:5432 postgres:16
+```
+
+(Use 55432 to avoid clashing with other local Postgres on 5432.)
+
+### 2. Install
+
+```bash
+corepack enable          # one-time, picks up the pnpm version pinned in package.json
+pnpm install
 cd contracts && forge install && cd ..
 ```
 
-### 2. Configure
+### 3. Configure
 
 ```bash
 cp .env.example .env
 cp client/.env.example client/.env
 ```
 
-Fill in `.env`:
-- `DEPLOYER_PRIVATE_KEY` — funded Base Sepolia EOA
-- `BASE_SEPOLIA_RPC` — defaults to https://sepolia.base.org
-- `DATABASE_URL` — postgres connection string
-- `SHIPPING_ENCRYPTION_KEY` — generate with `openssl rand -hex 32`
-- `BASESCAN_API_KEY` — optional (for `--verify`)
-
-### 3. Build + test contracts
+Fill `.env` (see `.env.example` — the deploy keys are optional for dev). Generate the encryption key with:
 
 ```bash
-npm run contracts:build
-npm run contracts:test
+openssl rand -hex 32      # → SHIPPING_ENCRYPTION_KEY
 ```
 
-All 17 tests should pass.
-
-### 4. Deploy to Base Sepolia
+### 4. Contracts (optional for gateway-only flow)
 
 ```bash
-npm run contracts:deploy:sepolia
+pnpm contracts:build
+pnpm contracts:test       # 27 tests
 ```
 
-The script deploys `MockIPE` (since `IPE_TOKEN_ADDRESS` is empty) and `IpeMarket`. Copy the printed addresses into both `.env` and `client/.env`:
-
-```
-IPE_TOKEN_ADDRESS=0x…       # also as VITE_IPE_TOKEN_ADDRESS
-IPE_MARKET_ADDRESS=0x…      # also as VITE_IPE_MARKET_ADDRESS
-```
-
-Sync the freshly compiled ABIs into the shared package:
+For local chain dev:
 
 ```bash
+anvil --chain-id 84532 --port 8545 &
+DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+  pnpm contracts:deploy:sepolia
 node shared/scripts/sync-abi.mjs
 ```
 
-### 5. Database + seed
+Then paste the printed addresses into `.env` + `client/.env`.
+
+### 5. Database schema + seed
 
 ```bash
-npm run db:push    # creates tables
-npm run seed       # inserts 4 placeholder products
+pnpm db:push
+pnpm seed                 # 4 placeholder products
 ```
 
 ### 6. Run
 
 ```bash
-npm run dev   # server on :3001, client on :5173
+pnpm dev                  # server :3005 + client :5173
 ```
 
-## Happy path (manual smoke test)
+## Production
 
-1. **Faucet IPE for yourself.** Open Basescan, find `MockIPE`, call `faucet()` from your wallet — you get 1000 mIPE.
-2. **Push a product onchain.** Visit `/admin`, click `Push onchain` next to "Ipê T-Shirt". Sign the tx; the tokenId is recorded.
-3. **Buy.** Visit `/shop` → click the t-shirt → fill the shipping form → click `Buy`. Two txs (approve + buy).
-4. **Watch the indexer.** Within ~15s the server logs `[indexer] order … marked paid`.
-5. **Check `/orders`** — your purchase shows as `paid` and links to the tx on Basescan.
-6. **Back in `/admin`** — mark the order as `shipped`, then `delivered`. The shipping address is decrypted server-side and surfaced only here.
-7. **(Optional) Resale.** From a different wallet that holds a 1155, call `listForResale(tokenId, 1, price)` directly via Basescan — buyResale flow can be exercised the same way (UI lands in v0.2).
-
-## What's deferred (see `ARCHITECTURE.md` for the full roadmap)
-
-- Multicurrency (USDC/ETH via oracle)
-- Multisig treasury (Safe)
-- Discount tier for passport holders
-- Refund/burn flow in admin
-- Drops with Merkle allowlist
-- Subgraph (TheGraph) replacing the polling indexer
-- Farcaster Frame
-- Mainnet deploy + audit
+See [`DEPLOY.md`](./DEPLOY.md) for the full Supabase + Railway + Vercel walkthrough.
 
 ## Useful commands
 
 ```bash
-npm run contracts:build         # forge build
-npm run contracts:test          # forge test -vv
-npm run contracts:deploy:sepolia
-npm run db:push                 # drizzle-kit push
-npm --workspace server run db:studio
-npm run seed
-npm run dev                     # server + client in parallel
+pnpm contracts:build          # forge build
+pnpm contracts:test           # forge test -vv
+pnpm contracts:deploy:sepolia
+pnpm db:push                  # drizzle-kit push
+pnpm --filter @ipe/server db:studio
+pnpm seed
+pnpm push-onchain             # batch list off-chain products onchain
+pnpm dev                      # server + client in parallel
 ```
