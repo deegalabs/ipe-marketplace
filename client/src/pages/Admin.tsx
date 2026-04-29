@@ -551,9 +551,14 @@ function ImageUrlField({ value, onChange }: { value: string; onChange: (v: strin
           onChange={(e) => onChange(e.target.value)}
         />
         {isDrive && (
-          <p className="text-[10px] text-ipe-green/70 truncate" title={resolved}>
-            Drive link rewritten on save → {resolved.replace('https://lh3.googleusercontent.com/d/', '…/')}
-          </p>
+          <>
+            <p className="text-[10px] text-ipe-green/70 truncate" title={resolved}>
+              Drive link rewritten on save → {resolved.replace('https://lh3.googleusercontent.com/d/', '…/')}
+            </p>
+            <p className="text-[10px] text-amber-700">
+              ⚠ The Drive file must be set to <strong>"anyone with the link can view"</strong>, otherwise the image will 404 for buyers.
+            </p>
+          </>
         )}
       </div>
       <div className="w-16 h-16 rounded border border-ipe-green/20 bg-ipe-green/5 overflow-hidden flex items-center justify-center text-[10px] text-ipe-ink/50 shrink-0">

@@ -7,6 +7,15 @@ type Product = typeof schema.products.$inferSelect;
 
 const resend = features.email ? new Resend(env.RESEND_API_KEY) : null;
 
+/// Cheap HTML escape for user-controlled fields interpolated into email bodies.
+/// Buyers control customerEmail and pickupDisplayName; admins control product.name
+/// and product.description. We escape both — no reason to trust either at the
+/// HTML rendering layer.
+const esc = (s: string | null | undefined) =>
+  String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!),
+  );
+
 interface SendArgs {
   to: string;
   subject: string;
@@ -52,18 +61,18 @@ const fmtAmount = (o: Order, p: Product) => {
 export async function sendOrderCreated(order: Order, product: Product) {
   if (!order.customerEmail) return;
   const body = `
-    <p>Hi! We received your order for <strong>${product.name}</strong>.</p>
+    <p>Hi! We received your order for <strong>${esc(product.name)}</strong>.</p>
     <p style="margin:16px 0;">
       Quantity: <strong>${order.quantity}</strong><br>
-      Total: <strong>${fmtAmount(order, product)}</strong><br>
-      Status: <strong>${order.status}</strong>
+      Total: <strong>${esc(fmtAmount(order, product))}</strong><br>
+      Status: <strong>${esc(order.status)}</strong>
     </p>
     ${
       order.status === 'awaiting_payment'
         ? `<p>Complete the payment using the QR code we showed at checkout. We'll email you again once it confirms.</p>`
         : `<p>Payment confirmed. We'll send another note once your item ${order.deliveryMethod === 'pickup' ? 'is ready for pickup' : 'ships'}.</p>`
     }
-    <p><a href="${env.PUBLIC_APP_URL}/orders" style="display:inline-block;background:#0a3a2f;color:#f8f5ec;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:500;">Track your order</a></p>
+    <p><a href="${esc(env.PUBLIC_APP_URL)}/orders" style="display:inline-block;background:#0a3a2f;color:#f8f5ec;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:500;">Track your order</a></p>
   `;
   await send({
     to: order.customerEmail,
@@ -75,9 +84,9 @@ export async function sendOrderCreated(order: Order, product: Product) {
 export async function sendOrderPaid(order: Order, product: Product) {
   if (!order.customerEmail) return;
   const body = `
-    <p>Payment for your <strong>${product.name}</strong> has cleared.</p>
-    <p>We're getting it ready ${order.deliveryMethod === 'pickup' ? `for pickup at <strong>${order.pickupEventId ?? 'the event'}</strong>` : 'to ship'}.</p>
-    ${order.buyerAddress ? `<p style="font-size:13px;color:#0a3a2f;">Your onchain receipt was minted to <code>${order.buyerAddress.slice(0, 10)}…${order.buyerAddress.slice(-6)}</code>.</p>` : ''}
+    <p>Payment for your <strong>${esc(product.name)}</strong> has cleared.</p>
+    <p>We're getting it ready ${order.deliveryMethod === 'pickup' ? `for pickup at <strong>${esc(order.pickupEventId ?? 'the event')}</strong>` : 'to ship'}.</p>
+    ${order.buyerAddress ? `<p style="font-size:13px;color:#0a3a2f;">Your onchain receipt was minted to <code>${esc(order.buyerAddress.slice(0, 10))}…${esc(order.buyerAddress.slice(-6))}</code>.</p>` : ''}
   `;
   await send({
     to: order.customerEmail,
@@ -89,8 +98,8 @@ export async function sendOrderPaid(order: Order, product: Product) {
 export async function sendOrderShipped(order: Order, product: Product) {
   if (!order.customerEmail) return;
   const body = `
-    <p>Your <strong>${product.name}</strong> is on its way.</p>
-    ${order.trackingCode ? `<p>Tracking code: <strong>${order.trackingCode}</strong></p>` : ''}
+    <p>Your <strong>${esc(product.name)}</strong> is on its way.</p>
+    ${order.trackingCode ? `<p>Tracking code: <strong>${esc(order.trackingCode)}</strong></p>` : ''}
   `;
   await send({
     to: order.customerEmail,
@@ -102,7 +111,7 @@ export async function sendOrderShipped(order: Order, product: Product) {
 export async function sendOrderReadyForPickup(order: Order, product: Product) {
   if (!order.customerEmail) return;
   const body = `
-    <p>Your <strong>${product.name}</strong> is ready for pickup at <strong>${order.pickupEventId}</strong>.</p>
+    <p>Your <strong>${esc(product.name)}</strong> is ready for pickup at <strong>${esc(order.pickupEventId)}</strong>.</p>
     <p>Show your wallet (the 1155 receipt) and your ID at the event to collect.</p>
   `;
   await send({
@@ -114,7 +123,7 @@ export async function sendOrderReadyForPickup(order: Order, product: Product) {
 
 export async function sendOrderDelivered(order: Order, product: Product) {
   if (!order.customerEmail) return;
-  const body = `<p>Your <strong>${product.name}</strong> has been delivered. Hope you love it.</p>`;
+  const body = `<p>Your <strong>${esc(product.name)}</strong> has been delivered. Hope you love it.</p>`;
   await send({
     to: order.customerEmail,
     subject: `Delivered — ${product.name}`,
@@ -127,15 +136,15 @@ export async function sendAdminNewOrder(order: Order, product: Product) {
   const body = `
     <p>New order placed.</p>
     <p style="font-size:13px;">
-      Product: <strong>${product.name}</strong><br>
+      Product: <strong>${esc(product.name)}</strong><br>
       Quantity: ${order.quantity}<br>
-      Total: ${fmtAmount(order, product)}<br>
-      Method: ${order.paymentMethod} (${order.paymentProvider})<br>
-      Delivery: ${order.deliveryMethod}${order.pickupEventId ? ` @ ${order.pickupEventId}` : ''}<br>
-      Buyer: ${order.buyerAddress ?? order.customerEmail ?? '—'}<br>
-      Status: ${order.status}
+      Total: ${esc(fmtAmount(order, product))}<br>
+      Method: ${esc(order.paymentMethod)} (${esc(order.paymentProvider)})<br>
+      Delivery: ${esc(order.deliveryMethod)}${order.pickupEventId ? ` @ ${esc(order.pickupEventId)}` : ''}<br>
+      Buyer: ${esc(order.buyerAddress ?? order.customerEmail ?? '—')}<br>
+      Status: ${esc(order.status)}
     </p>
-    <p><a href="${env.PUBLIC_APP_URL}/admin">Open admin</a></p>
+    <p><a href="${esc(env.PUBLIC_APP_URL)}/admin">Open admin</a></p>
   `;
   await send({
     to: env.ADMIN_NOTIFICATION_EMAIL,

@@ -67,9 +67,39 @@ const envSchema = z.object({
     .string()
     .default('false')
     .transform((v) => v === 'true' || v === '1'),
+
+  /// Escape hatch for local dev / staging where you can't reach the real
+  /// webhook providers. NEVER set this in production — it skips signature
+  /// verification on /webhooks/*, letting anyone mark orders as paid.
+  ALLOW_UNVERIFIED_WEBHOOKS: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
+
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
 
 export const env = envSchema.parse(process.env);
+
+/// Production hardening — fail fast on missing critical secrets so a
+/// misconfigured deploy crashes loudly instead of running with insecure
+/// fallbacks.
+const isProd = env.NODE_ENV === 'production';
+
+if (isProd) {
+  if (!env.ADMIN_JWT_SECRET || env.ADMIN_JWT_SECRET.length < 32) {
+    throw new Error('ADMIN_JWT_SECRET must be set to a 32+ char value in production');
+  }
+  if (env.ALLOW_UNVERIFIED_WEBHOOKS) {
+    throw new Error('ALLOW_UNVERIFIED_WEBHOOKS must not be enabled in production');
+  }
+  if (env.MERCADOPAGO_ACCESS_TOKEN && !env.MERCADOPAGO_WEBHOOK_SECRET) {
+    throw new Error('MERCADOPAGO_WEBHOOK_SECRET is required when Mercado Pago is enabled in production');
+  }
+  if (env.NOWPAYMENTS_API_KEY && !env.NOWPAYMENTS_IPN_SECRET) {
+    throw new Error('NOWPAYMENTS_IPN_SECRET is required when NOWPayments is enabled in production');
+  }
+}
 
 /// Quick capability flags so routes can return 503 cleanly when a provider isn't configured.
 export const features = {

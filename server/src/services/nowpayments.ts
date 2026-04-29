@@ -56,8 +56,12 @@ export async function createInvoice(args: CreateInvoiceArgs): Promise<Invoice> {
 /// Sent in the `x-nowpayments-sig` header. We re-serialize sorted to verify.
 export function verifyIpnSignature(rawBody: string, signature: string | undefined): boolean {
   if (!env.NOWPAYMENTS_IPN_SECRET) {
-    console.warn('[nowpayments] IPN secret not configured — accepting unverified payload');
-    return true;
+    if (env.ALLOW_UNVERIFIED_WEBHOOKS) {
+      console.warn('[nowpayments] IPN secret missing — ALLOW_UNVERIFIED_WEBHOOKS bypassing verification');
+      return true;
+    }
+    console.error('[nowpayments] IPN secret missing — rejecting payload');
+    return false;
   }
   if (!signature) return false;
 

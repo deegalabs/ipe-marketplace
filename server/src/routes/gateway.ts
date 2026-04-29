@@ -1,5 +1,5 @@
 import { Router, raw } from 'express';
-import { eq } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { createGatewayOrderInputSchema } from '@ipe/shared';
 import { db, schema } from '../db/client.js';
 import { encryptAddress } from '../crypto.js';
@@ -159,13 +159,7 @@ gatewayRouter.post('/webhooks/mercadopago', async (req, res) => {
     }
     if (!payment.external_reference) return res.status(200).send();
 
-    const order = await db.query.orders.findFirst({
-      where: eq(schema.orders.id, payment.external_reference),
-    });
-    if (!order || order.status === 'paid' || order.status === 'shipped' || order.status === 'delivered') {
-      return res.status(200).send();
-    }
-    await markPaidAndMint(order.id);
+    await markPaidAndMint(payment.external_reference);
     return res.status(200).send();
   } catch (err) {
     console.error('[mercadopago] webhook handler failed', err);
@@ -198,42 +192,54 @@ gatewayRouter.post('/webhooks/nowpayments', raw({ type: 'application/json' }), a
     return res.status(200).send();
   }
 
-  const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, parsed.order_id) });
-  if (!order || order.status === 'paid' || order.status === 'shipped' || order.status === 'delivered') {
-    return res.status(200).send();
-  }
-
-  await markPaidAndMint(order.id);
+  await markPaidAndMint(parsed.order_id);
   return res.status(200).send();
 });
 
-/// Common path used by both webhooks once payment is confirmed:
-/// flip to 'paid', mint the 1155 if a buyer wallet exists, send emails.
+/// Common path used by both webhooks once payment is confirmed.
+///
+/// Race-safe: a single UPDATE...RETURNING claims the row only if the status is
+/// still in a pre-paid state. Concurrent webhook deliveries (Mercado Pago
+/// retries within ms of each other, or NOWPayments confirming twice) only see
+/// a row returned in the FIRST call — the second is a no-op.
+///
+/// After successfully claiming, we mint the 1155 (if the buyer attached a
+/// wallet) and send the confirmation email. Mint failure does NOT roll back
+/// the paid status — the operator can retry mintTo manually from cast/etherscan
+/// once the underlying chain issue clears.
 async function markPaidAndMint(orderId: string) {
-  const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, orderId) });
-  if (!order) return;
-  const product = await db.query.products.findFirst({ where: eq(schema.products.id, order.productId) });
-  if (!product) return;
+  const [claimed] = await db
+    .update(schema.orders)
+    .set({ status: 'paid', updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.orders.id, orderId),
+        inArray(schema.orders.status, ['pending', 'awaiting_payment'] as const),
+      ),
+    )
+    .returning();
+  if (!claimed) return; // already paid by a previous delivery, or order missing — no-op
 
-  if (order.buyerAddress && product.tokenId) {
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, claimed.productId) });
+  if (!product) {
+    console.warn(`[gateway] order ${orderId} paid but product ${claimed.productId} missing — skipping mint+email`);
+    return;
+  }
+
+  if (claimed.buyerAddress && product.tokenId) {
     try {
       await mintReceiptForGatewayOrder(
-        order.buyerAddress as `0x${string}`,
+        claimed.buyerAddress as `0x${string}`,
         product.tokenId,
-        order.quantity,
-        order.id,
+        claimed.quantity,
+        claimed.id,
       );
     } catch (err) {
-      console.error('[gateway] mintTo failed (order still marked paid)', err);
+      console.error('[gateway] mintTo failed (order still marked paid — retry manually)', err);
     }
   }
 
-  const [updated] = await db
-    .update(schema.orders)
-    .set({ status: 'paid', updatedAt: new Date() })
-    .where(eq(schema.orders.id, orderId))
-    .returning();
-  if (updated) void sendOrderPaid(updated, product);
+  void sendOrderPaid(claimed, product);
 }
 
 // ─── Local dev helper ────────────────────────────────────────────────

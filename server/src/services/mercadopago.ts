@@ -90,8 +90,13 @@ export function verifyWebhookSignature(headers: {
   paymentId: string;
 }): boolean {
   if (!env.MERCADOPAGO_WEBHOOK_SECRET) {
-    console.warn('[mercadopago] webhook secret not configured — accepting unverified payload');
-    return true;
+    if (env.ALLOW_UNVERIFIED_WEBHOOKS) {
+      console.warn('[mercadopago] webhook secret missing — ALLOW_UNVERIFIED_WEBHOOKS bypassing verification');
+      return true;
+    }
+    // Fail closed: anyone could POST to /webhooks/mercadopago and mark orders paid.
+    console.error('[mercadopago] webhook secret missing — rejecting payload');
+    return false;
   }
   if (!headers.signature || !headers.requestId) return false;
 

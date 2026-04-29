@@ -15,10 +15,14 @@ const SESSION_TTL_HOURS = 12;
 const BCRYPT_COST = 12;
 
 function secret(): string {
-  if (env.ADMIN_JWT_SECRET) return env.ADMIN_JWT_SECRET;
-  // Dev fallback so local boot doesn't fail. Loud warning so we notice.
-  console.warn('[auth] ADMIN_JWT_SECRET not set — using insecure dev fallback');
-  return 'dev-only-insecure-secret-do-not-use-in-prod';
+  if (env.ADMIN_JWT_SECRET && env.ADMIN_JWT_SECRET.length >= 32) {
+    return env.ADMIN_JWT_SECRET;
+  }
+  // Hard fail rather than silently signing tokens with a guessable string.
+  // env.ts already enforces this in production; this guard catches dev misconfig too.
+  throw new Error(
+    'ADMIN_JWT_SECRET is missing or too short (need 32+ chars). Generate with: openssl rand -base64 48',
+  );
 }
 
 export async function hashPassword(plain: string): Promise<string> {
@@ -48,7 +52,12 @@ export async function ensureBootstrapAdmin() {
   if (!env.ADMIN_INITIAL_EMAIL || !env.ADMIN_INITIAL_PASSWORD) return;
   const email = env.ADMIN_INITIAL_EMAIL.toLowerCase();
   const existing = await db.query.adminUsers.findFirst({ where: eq(schema.adminUsers.email, email) });
-  if (existing) return;
+  if (existing) {
+    // Common confusion: rotating ADMIN_INITIAL_PASSWORD has no effect once the
+    // admin row exists. Log loudly so it's not a silent gotcha.
+    console.log(`[auth] bootstrap admin "${email}" already exists — ADMIN_INITIAL_PASSWORD is ignored`);
+    return;
+  }
   const passwordHash = await hashPassword(env.ADMIN_INITIAL_PASSWORD);
   await db.insert(schema.adminUsers).values({ email, passwordHash, name: 'bootstrap' });
   console.log(`[auth] bootstrap admin "${email}" created`);
