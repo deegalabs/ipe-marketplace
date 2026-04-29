@@ -27,7 +27,7 @@ export function ProductPage() {
   const { currency, rates } = useCurrency();
 
   const [paymentMethod, setPaymentMethod] = useState<'ipe' | 'usdc' | 'pix'>('ipe');
-  const [delivery, setDelivery] = useState<'shipping' | 'pickup'>('shipping');
+  const [delivery, setDelivery] = useState<'shipping' | 'pickup'>('pickup');
   const [shipping, setShipping] = useState<ShippingFormValues | null>(null);
   const [pickup, setPickup] = useState<PickupFormValues | null>(null);
   const [step, setStep] = useState<Step>('idle');
@@ -42,8 +42,11 @@ export function ProductPage() {
     BigInt(p.priceUsdc) > 0n ? 'usdc' : null,
     // PIX is wired in v0.3 — gate it once Asaas integration is in.
   ].filter((x): x is 'ipe' | 'usdc' => !!x);
+  // Shipping is disabled globally for the launch (pickup-only). Each product can
+  // still flag `shippingAvailable: true`, but the UI gates it until logistics are wired.
+  const SHIPPING_GLOBALLY_ENABLED = false;
   const enabledDeliveries: ('shipping' | 'pickup')[] = [
-    p.shippingAvailable ? 'shipping' : null,
+    SHIPPING_GLOBALLY_ENABLED && p.shippingAvailable ? 'shipping' : null,
     p.pickupAvailable ? 'pickup' : null,
   ].filter((x): x is 'shipping' | 'pickup' => !!x);
 
@@ -226,15 +229,16 @@ function DeliverySelector({
   onChange: (v: 'shipping' | 'pickup') => void;
   enabled: ('shipping' | 'pickup')[];
 }) {
+  const opts = [
+    { id: 'shipping' as const, label: 'Ship to me', desc: 'Shipping address required', soon: true },
+    { id: 'pickup' as const, label: 'Pick up at event', desc: 'Show your receipt at the event', soon: false },
+  ];
   return (
     <fieldset className="space-y-2">
       <legend className="label">Delivery</legend>
       <div className="grid grid-cols-2 gap-2">
-        {([
-          { id: 'shipping' as const, label: 'Ship to me', desc: 'Shipping address required' },
-          { id: 'pickup' as const, label: 'Pick up at event', desc: 'Show your receipt at the event' },
-        ]).map((o) => {
-          const disabled = !enabled.includes(o.id);
+        {opts.map((o) => {
+          const disabled = !enabled.includes(o.id) || o.soon;
           return (
             <button
               key={o.id}
@@ -249,6 +253,7 @@ function DeliverySelector({
             >
               <div className="font-medium">{o.label}</div>
               <div className="text-xs text-ipe-ink/70">{o.desc}</div>
+              {o.soon && <div className="text-[10px] text-amber-700 mt-1">soon</div>}
             </button>
           );
         })}

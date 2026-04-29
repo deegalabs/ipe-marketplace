@@ -26,9 +26,6 @@ export function Shop() {
                 {p.tokenId === null && (
                   <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">offline</span>
                 )}
-                {p.shippingAvailable && (
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-ipe-green/10 text-ipe-green">ship</span>
-                )}
                 {p.pickupAvailable && (
                   <span className="text-xs px-1.5 py-0.5 rounded bg-ipe-green/10 text-ipe-green">pickup</span>
                 )}
