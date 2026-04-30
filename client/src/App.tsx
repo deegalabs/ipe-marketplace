@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Route, Switch, Link, useLocation } from 'wouter';
 import { usePrivy } from '@privy-io/react-auth';
 import { useQuery } from '@tanstack/react-query';
@@ -5,6 +6,7 @@ import { Shop } from './pages/Shop';
 import { ProductPage } from './pages/Product';
 import { Orders } from './pages/Orders';
 import { Admin } from './pages/Admin';
+import { AdminPoster } from './pages/AdminPoster';
 import { InstallPrompt } from './components/InstallPrompt';
 import { Logo, FlowerMark } from './components/Logo';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -20,6 +22,7 @@ export function App() {
           <Route path="/" component={Shop} />
           <Route path="/product/:id" component={ProductPage} />
           <Route path="/orders" component={Orders} />
+          <Route path="/admin/poster">{() => <AdminGate><AdminPoster /></AdminGate>}</Route>
           <Route path="/admin">{() => <AdminGate />}</Route>
           <Route>
             <p className="text-center text-ipe-ink-50">Page not found.</p>
@@ -131,7 +134,7 @@ function NavLink({ href, label }: { href: string; label: string }) {
 ///   - not logged in via Privy → CTA to use the Connect button
 ///   - logged in but not in admin_emails → friendly "no access" message
 ///   - admin → render dashboard
-function AdminGate() {
+function AdminGate({ children }: { children?: ReactNode }) {
   const { authenticated, ready, login, user } = usePrivy();
   const meQ = useQuery({
     queryKey: ['admin-me'],
@@ -184,7 +187,7 @@ function AdminGate() {
     );
   }
 
-  return <Admin />;
+  return <>{children ?? <Admin />}</>;
 }
 
 /// Native-feeling bottom nav for mobile. Hidden on desktop (≥sm) where the

@@ -33,7 +33,10 @@ export function Admin() {
             Signed in as {meQ.data?.email ?? user?.email?.address ?? '—'}
           </p>
         </div>
-        <button onClick={logout} className="btn-ghost text-xs">Sign out</button>
+        <div className="flex items-center gap-2">
+          <a href="/admin/poster" className="btn-ghost text-xs">Install poster</a>
+          <button onClick={logout} className="btn-ghost text-xs">Sign out</button>
+        </div>
       </header>
 
       <TreasuryCard data={treasuryQ.data} loading={treasuryQ.isLoading} />
