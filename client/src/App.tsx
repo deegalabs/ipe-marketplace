@@ -46,8 +46,8 @@ function Header() {
     >
       <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center justify-between sm:gap-8">
-          <Link href="/" className="hover:opacity-80 transition-opacity">
-            <Logo />
+          <Link href="/" className="hover:opacity-80 transition-opacity" aria-label="Ipê Store home">
+            <Logo height={28} />
           </Link>
           {/* Inline nav links visible only on desktop; mobile uses BottomNav */}
           <nav className="hidden sm:flex gap-6 text-sm font-medium">

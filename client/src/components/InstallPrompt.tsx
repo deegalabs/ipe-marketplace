@@ -24,6 +24,14 @@ export function InstallPrompt() {
     if (window.matchMedia('(display-mode: standalone)').matches) return;
     if ((navigator as Navigator & { standalone?: boolean }).standalone) return;
 
+    // Only show on phones — desktop "install as app" is rarely useful for an
+    // e-commerce flow and clutters the page. We treat any non-coarse-pointer
+    // device as desktop, plus a max-width guard for narrow desktop windows.
+    const isMobile =
+      window.matchMedia('(pointer: coarse)').matches &&
+      window.matchMedia('(max-width: 820px)').matches;
+    if (!isMobile) return;
+
     const onBeforeInstall = (e: Event) => {
       e.preventDefault();
       setDeferred(e as BeforeInstallPromptEvent);

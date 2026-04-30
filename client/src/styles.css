@@ -5,6 +5,13 @@
 @layer base {
   :root {
     color-scheme: light;
+    /* Primary text color as RGB triplet (no alpha) — Tailwind's <alpha-value>
+       slot composes opacity at utility time so text-ipe-ink/60 still works. */
+    --color-ink: 14 14 12;
+  }
+  html.dark {
+    color-scheme: dark;
+    --color-ink: 248 245 236;        /* cream-100 */
   }
 
   html, body {
@@ -36,6 +43,32 @@
   html.dark ::selection {
     background: theme('colors.ipe.gold.DEFAULT');
     color: theme('colors.ipe.green.800');
+  }
+
+  /* Brand greens used as primary text/headlines flip to cream in dark mode.
+     Cleaner than peppering dark:text-ipe-cream-100 across every page. */
+  html.dark .text-ipe-green-600,
+  html.dark .text-ipe-green-700 {
+    color: theme('colors.ipe.cream.100');
+  }
+  html.dark .text-ipe-gold-600 {
+    color: theme('colors.ipe.gold.DEFAULT');
+  }
+  html.dark .border-ipe-stone-200,
+  html.dark .border-ipe-stone-200\/60 {
+    border-color: theme('colors.ipe.green.500' / 30%);
+  }
+  html.dark .bg-white,
+  html.dark .bg-white\/95,
+  html.dark .bg-white\/60 {
+    background-color: rgb(10 58 47 / 0.4);   /* ipe-green-600 @ 0.4 */
+  }
+  html.dark .bg-ipe-green-100 {
+    background-color: rgb(10 58 47 / 0.5);
+  }
+  html.dark .bg-ipe-stone-100,
+  html.dark .bg-ipe-stone-50 {
+    background-color: rgb(10 58 47 / 0.25);
   }
 
   ::selection {

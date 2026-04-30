@@ -39,12 +39,15 @@ export default {
             300: '#e3dcc4',
             DEFAULT: '#f8f5ec',
           },
+          /// `ink` is the primary text color. Driven by a CSS variable so it
+          /// flips to cream in dark mode automatically — every text-ipe-ink/N,
+          /// border-ipe-ink, etc. inherits without per-component dark variants.
           ink: {
-            DEFAULT: '#0e0e0c',
-            70: 'rgba(14, 14, 12, 0.7)',
-            50: 'rgba(14, 14, 12, 0.5)',
-            30: 'rgba(14, 14, 12, 0.3)',
-            10: 'rgba(14, 14, 12, 0.1)',
+            DEFAULT: 'rgb(var(--color-ink) / <alpha-value>)',
+            70: 'rgb(var(--color-ink) / 0.7)',
+            50: 'rgb(var(--color-ink) / 0.5)',
+            30: 'rgb(var(--color-ink) / 0.3)',
+            10: 'rgb(var(--color-ink) / 0.1)',
           },
           /// Warm neutrals — subtle surfaces that don't fight the cream bg.
           stone: {
