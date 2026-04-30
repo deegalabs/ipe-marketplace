@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { api, type ProductDTO } from '../api';
 import { priceDisplay } from '../lib/format';
+import { ProductImage } from '../components/ProductImage';
 
 export function Shop() {
   const { data, isLoading, error } = useQuery({ queryKey: ['products'], queryFn: api.listProducts });
@@ -96,12 +97,11 @@ function ProductCard({ product, index }: { product: ProductDTO; index: number })
       className="group relative block rounded-lg overflow-hidden bg-white dark:bg-ipe-green-700/40 border border-ipe-stone-200/60 dark:border-ipe-green-500/20 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-350 ease-smooth animate-fade-up"
       style={{ animationDelay: `${index * 70}ms` }}
     >
-      <div className="relative aspect-square overflow-hidden bg-ipe-stone-100 dark:bg-ipe-green-800/40">
-        <img
+      <div className="relative aspect-square overflow-hidden bg-ipe-stone-100 dark:bg-ipe-navy-800/40">
+        <ProductImage
           src={product.imageUrl}
           alt={product.name}
           className="w-full h-full object-cover transition-transform duration-500 ease-smooth group-hover:scale-110"
-          loading="lazy"
         />
         {/* Soft top-bottom gradient for label readability + premium feel */}
         <div

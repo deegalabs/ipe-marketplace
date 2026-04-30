@@ -582,22 +582,37 @@ function ImageUrlField({ value, onChange }: { value: string; onChange: (v: strin
       <div className="flex-1 space-y-1">
         <input
           className="input"
-          placeholder="Image URL or Google Drive share link"
+          placeholder="Optional — paste an image URL or Drive share link"
           value={value}
           onChange={(e) => onChange(e.target.value)}
         />
+        <p className="text-[11px] text-ipe-ink-50">
+          Leave blank to use a brand-tinted placeholder with the product name.
+        </p>
         {isDrive && (
-          <>
-            <p className="text-[10px] text-ipe-green/70 truncate" title={resolved}>
-              Drive link rewritten on save → {resolved.replace('https://lh3.googleusercontent.com/d/', '…/')}
-            </p>
-            <p className="text-[10px] text-amber-700">
-              ⚠ The Drive file must be set to <strong>"anyone with the link can view"</strong>, otherwise the image will 404 for buyers.
-            </p>
-          </>
+          <details className="text-[11px]">
+            <summary className="text-ipe-navy-600 dark:text-ipe-lime cursor-pointer">
+              Drive link detected — how to make it public
+            </summary>
+            <div className="mt-1.5 space-y-1 text-ipe-ink-70">
+              <p>
+                We auto-rewrite Drive share URLs to a thumbnail endpoint. To make it visible to
+                buyers, the file must be shared publicly:
+              </p>
+              <ol className="list-decimal list-inside space-y-0.5 pl-1">
+                <li>Open the file in Google Drive</li>
+                <li>Click <strong>Share</strong> (top-right)</li>
+                <li>Under <strong>General access</strong>, change to <strong>"Anyone with the link"</strong></li>
+                <li>Permission: <strong>Viewer</strong> · click Done</li>
+              </ol>
+              <p className="text-ipe-ink-50 truncate" title={resolved}>
+                Resolves to: <code className="font-mono">{resolved}</code>
+              </p>
+            </div>
+          </details>
         )}
       </div>
-      <div className="w-16 h-16 rounded border border-ipe-green/20 bg-ipe-green/5 overflow-hidden flex items-center justify-center text-[10px] text-ipe-ink/50 shrink-0">
+      <div className="w-16 h-16 rounded border border-ipe-stone-200 dark:border-ipe-navy-500/30 bg-ipe-stone-50 dark:bg-ipe-navy-700/30 overflow-hidden flex items-center justify-center text-[10px] text-ipe-ink-50 shrink-0">
         {resolved ? (
           <img
             src={resolved}

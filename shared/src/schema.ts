@@ -46,8 +46,11 @@ export const productInputSchema = z.object({
   name: z.string().min(1, 'Product needs a name').max(120),
   description: z.string().max(2_000).default(''),
   category: productCategoryEnum,
-  /// Image URL is optional at creation — admin can upload/paste later via edit.
-  imageUrl: z.string().url('Enter a valid URL or leave empty').or(z.literal('')).default(''),
+  /// Image is fully optional — accept any string the admin pastes (Drive
+  /// link, IPFS, full URL, even a bare Drive id). Server normalizes Drive
+  /// share URLs on save; non-URL input is stored as-is and the client falls
+  /// back to a brand placeholder card when the image won't load.
+  imageUrl: z.string().max(2_000).default(''),
   priceIpe: z.bigint().default(0n),
   priceUsdc: z.bigint().default(0n),
   priceBrl: z.bigint().default(0n),

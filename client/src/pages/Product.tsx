@@ -10,6 +10,7 @@ import { priceDisplay, formatToken, formatBrl } from '../lib/format';
 import { ShippingForm, type ShippingFormValues } from '../components/ShippingForm';
 import { PickupForm, type PickupFormValues } from '../components/PickupForm';
 import { GatewayCheckout } from '../components/GatewayCheckout';
+import { ProductImage } from '../components/ProductImage';
 
 type Step = 'idle' | 'approving' | 'buying' | 'recording' | 'done';
 
@@ -145,7 +146,7 @@ export function ProductPage() {
   return (
     <article className="grid md:grid-cols-2 gap-6 sm:gap-10">
       <div className="card overflow-hidden aspect-square motion-in">
-        <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+        <ProductImage src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
       </div>
       <div className="space-y-6 motion-in" style={{ animationDelay: '80ms' }}>
         <div>
