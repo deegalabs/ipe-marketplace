@@ -10,9 +10,15 @@ import { formatToken, formatBrl } from '../lib/format';
 import { normalizeImageUrl } from '../lib/imageUrl';
 import { useToast } from '../lib/toast';
 import { SkeletonBox, SkeletonText } from '../components/Skeleton';
+import { InstallPosterModal } from '../components/InstallPosterModal';
+import {
+  PlusIcon, PencilIcon, SignOutIcon, PrinterIcon, UploadIcon, RefreshIcon,
+  TruckIcon, PackageCheckIcon, UserCheckIcon, UserOffIcon, TrashIcon, SpinnerIcon,
+} from '../components/AdminIcons';
 
 export function Admin() {
   const { user, logout } = usePrivy();
+  const [posterOpen, setPosterOpen] = useState(false);
   const meQ = useQuery({ queryKey: ['admin-me'], queryFn: api.adminMe });
   const treasuryQ = useQuery({
     queryKey: ['treasury'],
@@ -34,8 +40,12 @@ export function Admin() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <a href="/admin/poster" className="btn-ghost text-xs">Install poster</a>
-          <button onClick={logout} className="btn-ghost text-xs">Sign out</button>
+          <button onClick={() => setPosterOpen(true)} className="action-btn-ghost">
+            <PrinterIcon /> Install poster
+          </button>
+          <button onClick={logout} className="action-btn-ghost">
+            <SignOutIcon /> Sign out
+          </button>
         </div>
       </header>
 
@@ -43,6 +53,8 @@ export function Admin() {
       <ProductsCard products={productsQ.data ?? []} loading={productsQ.isLoading} />
       <OrdersCard orders={ordersQ.data ?? []} products={productsQ.data ?? []} loading={ordersQ.isLoading} />
       <AdminsCard currentAdminId={meQ.data?.adminId} />
+
+      {posterOpen && <InstallPosterModal onClose={() => setPosterOpen(false)} />}
     </section>
   );
 }
@@ -218,7 +230,9 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xl font-semibold text-ipe-green">Products</h2>
         {editing === null && (
-          <button className="btn-ghost text-xs" onClick={() => setEditing('new')}>+ New product</button>
+          <button className="action-btn-primary" onClick={() => setEditing('new')}>
+            <PlusIcon /> New product
+          </button>
         )}
       </div>
 
@@ -249,8 +263,8 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
                   {' · stock '}{p.physicalStock}{p.active ? '' : ' · inactive'}
                 </p>
               </div>
-              <button className="btn-ghost text-xs" onClick={() => setEditing(p.id)} disabled={busyId === p.id}>
-                Edit
+              <button className="action-btn-ghost" onClick={() => setEditing(p.id)} disabled={busyId === p.id}>
+                <PencilIcon /> Edit
               </button>
             </div>
             <p className="text-sm mt-2">
@@ -259,13 +273,13 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
             </p>
             <div className="flex flex-wrap gap-2 mt-3">
               {!p.tokenId && (
-                <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => pushOnchain(p)}>
-                  {busyId === p.id ? 'Pushing…' : 'Push onchain'}
+                <button className="action-btn-primary" disabled={busyId === p.id} onClick={() => pushOnchain(p)}>
+                  {busyId === p.id ? <><SpinnerIcon /> Pushing…</> : <><UploadIcon /> Push onchain</>}
                 </button>
               )}
               {p.tokenId && BigInt(p.priceUsdc) > 0n && (
-                <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'usdc')}>
-                  Sync USDC
+                <button className="action-btn-ghost" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'usdc')}>
+                  <RefreshIcon /> Sync USDC
                 </button>
               )}
             </div>
@@ -293,20 +307,22 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
                 <td>{BigInt(p.priceUsdc) > 0n ? `$${(Number(p.priceUsdc) / 1e6).toFixed(2)}` : '—'}</td>
                 <td>{p.physicalStock}</td>
                 <td>{p.active ? '✓' : '—'}</td>
-                <td className="space-x-2 whitespace-nowrap">
-                  <button className="btn-ghost text-xs" onClick={() => setEditing(p.id)} disabled={busyId === p.id}>
-                    Edit
-                  </button>
-                  {!p.tokenId && (
-                    <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => pushOnchain(p)}>
-                      {busyId === p.id ? 'Pushing…' : 'Push onchain'}
+                <td className="whitespace-nowrap">
+                  <div className="inline-flex items-center gap-2">
+                    <button className="action-btn-ghost" onClick={() => setEditing(p.id)} disabled={busyId === p.id}>
+                      <PencilIcon /> Edit
                     </button>
-                  )}
-                  {p.tokenId && BigInt(p.priceUsdc) > 0n && (
-                    <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'usdc')}>
-                      Sync USDC
-                    </button>
-                  )}
+                    {!p.tokenId && (
+                      <button className="action-btn-primary" disabled={busyId === p.id} onClick={() => pushOnchain(p)}>
+                        {busyId === p.id ? <><SpinnerIcon /> Pushing…</> : <><UploadIcon /> Push</>}
+                      </button>
+                    )}
+                    {p.tokenId && BigInt(p.priceUsdc) > 0n && (
+                      <button className="action-btn-ghost" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'usdc')}>
+                        <RefreshIcon /> Sync
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -474,13 +490,13 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                   </p>
                   <div className="mt-2">
                     {o.status === 'paid' && (
-                      <button className="btn-ghost text-xs" onClick={() => setStatus(o.id, 'shipped')}>
-                        {o.deliveryMethod === 'pickup' ? 'Mark delivered' : 'Mark shipped'}
+                      <button className="action-btn-ghost" onClick={() => setStatus(o.id, 'shipped')}>
+                        <TruckIcon /> {o.deliveryMethod === 'pickup' ? 'Mark delivered' : 'Mark shipped'}
                       </button>
                     )}
                     {o.status === 'shipped' && (
-                      <button className="btn-ghost text-xs" onClick={() => setStatus(o.id, 'delivered')}>
-                        Mark delivered
+                      <button className="action-btn-ghost" onClick={() => setStatus(o.id, 'delivered')}>
+                        <PackageCheckIcon /> Mark delivered
                       </button>
                     )}
                   </div>
@@ -689,8 +705,8 @@ function AdminsCard({ currentAdminId }: { currentAdminId: string | undefined }) 
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
         />
-        <button className="btn-primary" disabled={busy || !newEmail} onClick={add}>
-          {busy ? 'Adding…' : 'Add admin'}
+        <button className="action-btn-primary" disabled={busy || !newEmail} onClick={add}>
+          {busy ? <><SpinnerIcon /> Adding…</> : <><PlusIcon /> Add admin</>}
         </button>
       </div>
       {error && <p className="text-sm text-red-700 mb-3">{error}</p>}
@@ -725,11 +741,17 @@ function AdminsCard({ currentAdminId }: { currentAdminId: string | undefined }) 
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <button className="btn-ghost text-xs" onClick={() => toggle(a)} disabled={isSelf}>
-                  {a.active ? 'Deactivate' : 'Reactivate'}
+                <button
+                  className={a.active ? 'action-btn-destructive' : 'action-btn-primary'}
+                  onClick={() => toggle(a)}
+                  disabled={isSelf}
+                >
+                  {a.active ? <><UserOffIcon /> Deactivate</> : <><UserCheckIcon /> Reactivate</>}
                 </button>
                 {!isSelf && a.active && (
-                  <button className="btn-ghost text-xs" onClick={() => remove(a)}>Remove</button>
+                  <button className="action-btn-destructive" onClick={() => remove(a)}>
+                    <TrashIcon /> Remove
+                  </button>
                 )}
               </div>
             </li>

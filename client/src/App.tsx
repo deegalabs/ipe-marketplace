@@ -6,7 +6,6 @@ import { Shop } from './pages/Shop';
 import { ProductPage } from './pages/Product';
 import { Orders } from './pages/Orders';
 import { Admin } from './pages/Admin';
-import { AdminPoster } from './pages/AdminPoster';
 import { InstallPrompt } from './components/InstallPrompt';
 import { Logo, FlowerMark } from './components/Logo';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -22,7 +21,6 @@ export function App() {
           <Route path="/" component={Shop} />
           <Route path="/product/:id" component={ProductPage} />
           <Route path="/orders" component={Orders} />
-          <Route path="/admin/poster">{() => <AdminGate><AdminPoster /></AdminGate>}</Route>
           <Route path="/admin">{() => <AdminGate />}</Route>
           <Route>
             <p className="text-center text-ipe-ink-50">Page not found.</p>

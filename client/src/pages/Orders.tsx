@@ -137,21 +137,8 @@ function CancelOrderButton({ order: o }: { order: OrderDTO }) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={cancel}
-      disabled={busy}
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/15 hover:border-red-300 dark:hover:border-red-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      {busy ? (
-        <>
-          <SpinnerIcon /> Cancelling…
-        </>
-      ) : (
-        <>
-          <CloseIcon /> Cancel order
-        </>
-      )}
+    <button type="button" onClick={cancel} disabled={busy} className="action-btn-destructive">
+      {busy ? <><SpinnerIcon /> Cancelling…</> : <><CloseIcon /> Cancel order</>}
     </button>
   );
 }
@@ -163,11 +150,7 @@ function ResumePaymentButton({ order: o }: { order: OrderDTO }) {
   if (!hasResumeData) return null;
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-ipe-green-600 text-ipe-cream-50 hover:bg-ipe-green-700 dark:bg-ipe-gold dark:!text-ipe-green-800 dark:hover:bg-ipe-gold-300 transition-all duration-200 shadow-sm hover:shadow"
-      >
+      <button type="button" onClick={() => setOpen(true)} className="action-btn-primary">
         <QrIcon /> Resume payment
       </button>
       {open && <ResumePaymentModal order={o} onClose={() => setOpen(false)} />}
@@ -351,17 +334,9 @@ function ResumePaymentModal({ order: o, onClose }: { order: OrderDTO; onClose: (
               type="button"
               onClick={cancel}
               disabled={cancelling}
-              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/15 hover:border-red-300 dark:hover:border-red-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="action-btn-destructive w-full justify-center"
             >
-              {cancelling ? (
-                <>
-                  <SpinnerIcon /> Cancelling…
-                </>
-              ) : (
-                <>
-                  <CloseIcon /> Cancel this order
-                </>
-              )}
+              {cancelling ? <><SpinnerIcon /> Cancelling…</> : <><CloseIcon /> Cancel this order</>}
             </button>
           </div>
         </div>
