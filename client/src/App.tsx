@@ -117,14 +117,29 @@ function AdminGate() {
 
   if (meQ.isError) {
     const email = user?.email?.address;
+    const msg = String((meQ.error as Error)?.message ?? '');
+    // Differentiate 403 (real "not on allowlist") from other failures so we
+    // don't mislead the user when the server is misconfigured.
+    const isForbidden = msg.includes('not an admin') || msg === '403';
+    if (isForbidden) {
+      return (
+        <section className="max-w-md mx-auto py-10 text-center space-y-3">
+          <h1 className="text-xl font-bold text-ipe-green">No admin access</h1>
+          <p className="text-ipe-ink/70 text-sm">
+            {email ? <>The email <code>{email}</code> isn't on the admin allowlist.</> : 'Your account is not on the admin allowlist.'}
+          </p>
+          <p className="text-ipe-ink/60 text-xs">
+            Ask another admin to add your email, or sign out and try a different account.
+          </p>
+        </section>
+      );
+    }
     return (
       <section className="max-w-md mx-auto py-10 text-center space-y-3">
-        <h1 className="text-xl font-bold text-ipe-green">No admin access</h1>
-        <p className="text-ipe-ink/70 text-sm">
-          {email ? <>The email <code>{email}</code> isn't on the admin allowlist.</> : 'Your account is not on the admin allowlist.'}
-        </p>
+        <h1 className="text-xl font-bold text-ipe-green">Auth check failed</h1>
+        <p className="text-ipe-ink/70 text-sm">{msg || 'unknown error'}</p>
         <p className="text-ipe-ink/60 text-xs">
-          Ask another admin to add your email, or sign out and try a different account.
+          Likely a server config issue (missing or wrong PRIVY_APP_SECRET). Check the Railway logs.
         </p>
       </section>
     );
