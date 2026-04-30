@@ -88,7 +88,9 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
   const totalLabel = method === 'pix' ? brlPreview : `~$${usdAmount.toFixed(2)} USD`;
 
   function next() {
-    if (!email) { setError('Email is required.'); return; }
+    // Email only required for PIX (Mercado Pago needs payer.email). Wallet-only
+    // Privy logins (e.g. MetaMask) can still buy via crypto-gateway without it.
+    if (method === 'pix' && !email) { setError('Email is required for PIX.'); return; }
     if (wallet && !/^0x[a-fA-F0-9]{40}$/.test(wallet)) { setError('Wallet looks invalid.'); return; }
     setError(null);
     if (method === 'crypto-gateway') {
@@ -103,7 +105,7 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
     try {
       const res = await api.createGatewayOrder({
         productId: product.id,
-        customerEmail: email,
+        customerEmail: email || undefined,
         buyerAddress: wallet || undefined,
         quantity: 1,
         paymentMethod: 'pix',
@@ -127,7 +129,7 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
     try {
       const res = await api.createGatewayOrder({
         productId: product.id,
-        customerEmail: email,
+        customerEmail: email || undefined,
         buyerAddress: wallet || undefined,
         quantity: 1,
         paymentMethod: 'crypto-gateway',
@@ -276,7 +278,7 @@ function FormStep({ method, setMethod, email, setEmail, privyFilled, wallet, set
 
       <div>
         <label className="label">
-          Email (required)
+          Email {method === 'pix' ? '(required)' : '(optional)'}
           {privyFilled && <span className="ml-2 text-2xs text-ipe-green dark:text-ipe-gold normal-case font-medium tracking-normal">· from your account</span>}
         </label>
         <input
@@ -286,7 +288,11 @@ function FormStep({ method, setMethod, email, setEmail, privyFilled, wallet, set
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
         />
-        <p className="text-xs text-ipe-ink/60 mt-1">We'll send your receipt and shipping/pickup updates here.</p>
+        <p className="text-xs text-ipe-ink/60 mt-1">
+          {method === 'pix'
+            ? 'Required by Mercado Pago. We also use it for receipt + shipping/pickup updates.'
+            : 'Optional. If provided we send a receipt + pickup updates; otherwise only the onchain receipt.'}
+        </p>
       </div>
 
       <div>

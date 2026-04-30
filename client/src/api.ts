@@ -131,7 +131,8 @@ export const api = {
   /// Gateway checkout (Mercado Pago PIX or NOWPayments crypto-gateway).
   createGatewayOrder: (input: {
     productId: string;
-    customerEmail: string;
+    /// Required for PIX (Mercado Pago compliance), optional for crypto.
+    customerEmail?: string;
     buyerAddress?: string;
     quantity: number;
     paymentMethod: 'pix' | 'crypto-gateway';

@@ -154,7 +154,11 @@ export type CreateDirectOrderInput = z.infer<typeof createDirectOrderInputSchema
 export const createGatewayOrderInputSchema = z
   .object({
     productId: z.string().uuid(),
-    customerEmail: z.string().email(),
+    /// Optional at the schema level so wallet-only Privy logins (MetaMask
+    /// without email) can buy via crypto-gateway. Required at runtime only
+    /// for PIX, where Mercado Pago needs `payer.email` for compliance —
+    /// enforced by the refine() below.
+    customerEmail: z.string().email().optional(),
     buyerAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).optional(),
     quantity: z.number().int().positive(),
     /// 'pix' → Mercado Pago. 'crypto-gateway' → NOWPayments.
@@ -166,6 +170,10 @@ export const createGatewayOrderInputSchema = z
     deliveryMethod: deliveryMethodEnum,
     shippingAddress: shippingAddressSchema.optional(),
     pickup: pickupInfoSchema.optional(),
+  })
+  .refine((d) => d.paymentMethod !== 'pix' || !!d.customerEmail, {
+    message: 'customerEmail is required for PIX (Mercado Pago needs payer.email)',
+    path: ['customerEmail'],
   })
   .refine((d) => d.deliveryMethod === 'pickup' || d.shippingAddress, {
     message: 'shippingAddress is required when deliveryMethod = shipping',

@@ -67,7 +67,7 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
     .values({
       productId: parsed.data.productId,
       buyerAddress: parsed.data.buyerAddress?.toLowerCase() ?? null,
-      customerEmail: parsed.data.customerEmail,
+      customerEmail: parsed.data.customerEmail ?? null,
       quantity: parsed.data.quantity,
       paymentMethod: parsed.data.paymentMethod,
       paymentProvider: provider,
@@ -84,10 +84,11 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
 
   try {
     if (parsed.data.paymentMethod === 'pix') {
+      // The schema's refine() guarantees customerEmail is set when paymentMethod='pix'.
       const charge = await createPixCharge({
         amountCents: Number(totalPaid),
         description: `Ipê Store · ${product.name} ×${parsed.data.quantity}`,
-        payerEmail: parsed.data.customerEmail,
+        payerEmail: parsed.data.customerEmail!,
         externalReference: order.id,
       });
       const [updated] = await db
