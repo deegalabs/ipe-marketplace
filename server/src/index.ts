@@ -65,18 +65,7 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-/// Aggressive limiter on the login endpoint — bcrypt costs ~250ms per attempt
-/// so brute force is already painful, but we still cap to 5 attempts / 15min / IP.
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60_000,
-  limit: 5,
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-  message: { error: 'too many login attempts — try again in 15 minutes' },
-});
-
 app.get('/health', (_req, res) => res.json({ ok: true }));
-app.use('/admin/login', loginLimiter);
 app.use('/admin', adminAuthRouter);
 app.use('/products', productsRouter);
 app.use('/orders', ordersRouter);

@@ -1,9 +1,16 @@
 import { env } from './config';
-import { getAdminToken } from './lib/adminAuth';
 import type { CreateOrderInput, Rates, PaymentMethod, DeliveryMethod } from '@ipe/shared';
 
+/// Lazy-set by main.tsx after Privy mounts. The admin-flagged API calls below
+/// pull the access token from this getter so we don't need to thread it through
+/// react-query keys.
+let privyTokenGetter: (() => Promise<string | null>) | null = null;
+export function setPrivyTokenGetter(fn: () => Promise<string | null>) {
+  privyTokenGetter = fn;
+}
+
 interface RequestOpts extends RequestInit {
-  /// Attach the admin JWT from localStorage as Bearer.
+  /// Attach the Privy access token as Bearer for admin-gated endpoints.
   admin?: boolean;
 }
 
@@ -12,8 +19,8 @@ async function request<T>(path: string, init?: RequestOpts): Promise<T> {
     'Content-Type': 'application/json',
     ...((init?.headers as Record<string, string>) ?? {}),
   };
-  if (init?.admin) {
-    const token = getAdminToken();
+  if (init?.admin && privyTokenGetter) {
+    const token = await privyTokenGetter();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
   const res = await fetch(`${env.apiUrl}${path}`, { ...init, headers });
@@ -123,7 +130,35 @@ export const api = {
 
   treasury: () => request<TreasuryDTO>('/treasury'),
   rates: () => request<Rates>('/rates'),
+
+  /// Returns 200 with admin context if the connected Privy user is an admin,
+  /// 401 if no/invalid token, 403 if the user is not on the allowlist.
+  adminMe: () => request<{ email: string; name: string; adminId: string }>('/admin/me', { admin: true }),
+
+  listAdmins: () => request<AdminUserDTO[]>('/admin/admins', { admin: true }),
+  addAdmin: (body: { email: string; name?: string }) =>
+    request<AdminUserDTO>('/admin/admins', {
+      admin: true,
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateAdmin: (id: string, body: { name?: string; active?: boolean }) =>
+    request<AdminUserDTO>(`/admin/admins/${id}`, {
+      admin: true,
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  removeAdmin: (id: string) =>
+    request<AdminUserDTO>(`/admin/admins/${id}`, { admin: true, method: 'DELETE' }),
 };
+
+export interface AdminUserDTO {
+  id: string;
+  email: string;
+  name: string;
+  active: boolean;
+  createdAt: string;
+}
 
 function replacer(_key: string, value: unknown) {
   return typeof value === 'bigint' ? value.toString() : value;

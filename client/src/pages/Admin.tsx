@@ -3,15 +3,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePublicClient, useWriteContract } from 'wagmi';
 import { formatUnits, parseUnits, decodeEventLog, type Hex } from 'viem';
 import { IpeMarketAbi } from '@ipe/shared';
-import { api, type ProductDTO, type OrderDTO } from '../api';
+import { usePrivy } from '@privy-io/react-auth';
+import { api, type ProductDTO, type OrderDTO, type AdminUserDTO } from '../api';
 import { env } from '../config';
 import { formatToken, formatBrl } from '../lib/format';
 import { normalizeImageUrl } from '../lib/imageUrl';
 import { useCurrency } from '../lib/currency';
-import { useAdminAuth } from '../lib/adminAuth';
 
 export function Admin() {
-  const { session, logout } = useAdminAuth();
+  const { user, logout } = usePrivy();
+  const meQ = useQuery({ queryKey: ['admin-me'], queryFn: api.adminMe });
   const treasuryQ = useQuery({
     queryKey: ['treasury'],
     queryFn: api.treasury,
@@ -27,7 +28,9 @@ export function Admin() {
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold text-ipe-green">Admin</h1>
-          <p className="text-sm text-ipe-ink/60">Signed in as {session?.email}</p>
+          <p className="text-sm text-ipe-ink/60">
+            Signed in as {meQ.data?.email ?? user?.email?.address ?? '—'}
+          </p>
         </div>
         <button onClick={logout} className="btn-ghost text-xs">Sign out</button>
       </header>
@@ -35,6 +38,7 @@ export function Admin() {
       <TreasuryCard data={treasuryQ.data} />
       <ProductsCard products={productsQ.data ?? []} />
       <OrdersCard orders={ordersQ.data ?? []} products={productsQ.data ?? []} />
+      <AdminsCard currentAdminId={meQ.data?.adminId} />
     </section>
   );
 }
@@ -575,6 +579,106 @@ function ImageUrlField({ value, onChange }: { value: string; onChange: (v: strin
           'preview'
         )}
       </div>
+    </div>
+  );
+}
+
+/// Admin allowlist management — add an email and that person can sign into
+/// /admin via Privy. Soft-delete (active=false) hides the row from the gate
+/// without losing history. Self-deactivation is blocked server-side.
+function AdminsCard({ currentAdminId }: { currentAdminId: string | undefined }) {
+  const qc = useQueryClient();
+  const adminsQ = useQuery({ queryKey: ['admins'], queryFn: api.listAdmins });
+  const [newEmail, setNewEmail] = useState('');
+  const [newName, setNewName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function add() {
+    if (!newEmail) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.addAdmin({ email: newEmail.trim(), name: newName.trim() || undefined });
+      setNewEmail('');
+      setNewName('');
+      await qc.invalidateQueries({ queryKey: ['admins'] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed to add admin');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggle(a: AdminUserDTO) {
+    await api.updateAdmin(a.id, { active: !a.active });
+    await qc.invalidateQueries({ queryKey: ['admins'] });
+  }
+
+  async function remove(a: AdminUserDTO) {
+    if (!confirm(`Deactivate ${a.email}?`)) return;
+    try {
+      await api.removeAdmin(a.id);
+      await qc.invalidateQueries({ queryKey: ['admins'] });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'failed to remove');
+    }
+  }
+
+  return (
+    <div className="card p-5">
+      <h2 className="text-xl font-semibold text-ipe-green mb-3">Admins</h2>
+      <p className="text-xs text-ipe-ink/60 mb-3">
+        Anyone whose Privy-linked email is on this list can access /admin.
+      </p>
+
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <input
+          className="input flex-1"
+          type="email"
+          placeholder="email@domain.com"
+          value={newEmail}
+          onChange={(e) => setNewEmail(e.target.value)}
+        />
+        <input
+          className="input sm:w-40"
+          placeholder="Name (optional)"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+        />
+        <button className="btn-primary" disabled={busy || !newEmail} onClick={add}>
+          {busy ? 'Adding…' : 'Add admin'}
+        </button>
+      </div>
+      {error && <p className="text-sm text-red-700 mb-3">{error}</p>}
+
+      <ul className="divide-y divide-ipe-green/10">
+        {(adminsQ.data ?? []).map((a) => {
+          const isSelf = a.id === currentAdminId;
+          return (
+            <li key={a.id} className="py-2 flex items-center justify-between gap-3 text-sm">
+              <div className="flex-1 min-w-0">
+                <p className="truncate">
+                  {a.email}
+                  {a.name && <span className="text-ipe-ink/60"> · {a.name}</span>}
+                  {isSelf && <span className="text-xs ml-2 px-1.5 py-0.5 rounded bg-ipe-green/10 text-ipe-green">you</span>}
+                </p>
+                <p className="text-xs text-ipe-ink/50">
+                  added {new Date(a.createdAt).toLocaleDateString()} · {a.active ? 'active' : 'inactive'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button className="btn-ghost text-xs" onClick={() => toggle(a)} disabled={isSelf}>
+                  {a.active ? 'Deactivate' : 'Reactivate'}
+                </button>
+                {!isSelf && a.active && (
+                  <button className="btn-ghost text-xs" onClick={() => remove(a)}>Remove</button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

@@ -53,14 +53,16 @@ const envSchema = z.object({
   /// Where admin-alert emails go. Empty = skip admin emails.
   ADMIN_NOTIFICATION_EMAIL: z.string().default(''),
 
-  /// Secret for signing admin session JWTs. Generate with `openssl rand -base64 48`.
-  /// Required in production; will fail boot if missing on a non-localhost DATABASE_URL.
-  ADMIN_JWT_SECRET: z.string().default(''),
+  /// Privy server credentials — used to verify access tokens issued by the
+  /// Privy widget on the client. PRIVY_APP_ID must match VITE_PRIVY_APP_ID.
+  /// PRIVY_APP_SECRET is in the Privy dashboard → Settings → API keys.
+  PRIVY_APP_ID: z.string().default(''),
+  PRIVY_APP_SECRET: z.string().default(''),
 
-  /// On boot, if both are set and no admin with this email exists, create one.
-  /// Lets you bootstrap the first admin on a fresh deploy without a CLI step.
+  /// On boot, if set and not yet present, this email is added to the admin
+  /// allowlist. Idempotent — exists for fresh deploys to bootstrap the first
+  /// admin without a SQL step.
   ADMIN_INITIAL_EMAIL: z.string().default(''),
-  ADMIN_INITIAL_PASSWORD: z.string().default(''),
 
   /// Skip the chain event indexer (gateway-only deploys don't need it).
   DISABLE_INDEXER: z
@@ -87,8 +89,8 @@ export const env = envSchema.parse(process.env);
 const isProd = env.NODE_ENV === 'production';
 
 if (isProd) {
-  if (!env.ADMIN_JWT_SECRET || env.ADMIN_JWT_SECRET.length < 32) {
-    throw new Error('ADMIN_JWT_SECRET must be set to a 32+ char value in production');
+  if (!env.PRIVY_APP_ID || !env.PRIVY_APP_SECRET) {
+    throw new Error('PRIVY_APP_ID and PRIVY_APP_SECRET are required in production');
   }
   if (env.ALLOW_UNVERIFIED_WEBHOOKS) {
     throw new Error('ALLOW_UNVERIFIED_WEBHOOKS must not be enabled in production');

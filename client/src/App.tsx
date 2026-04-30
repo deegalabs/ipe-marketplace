@@ -1,13 +1,13 @@
-import { Route, Switch, Link, useLocation, Redirect } from 'wouter';
+import { Route, Switch, Link, useLocation } from 'wouter';
 import { usePrivy } from '@privy-io/react-auth';
+import { useQuery } from '@tanstack/react-query';
 import { Shop } from './pages/Shop';
 import { ProductPage } from './pages/Product';
 import { Orders } from './pages/Orders';
 import { Admin } from './pages/Admin';
-import { AdminLogin } from './pages/AdminLogin';
 import { CurrencyToggle } from './lib/currency';
-import { useAdminAuth } from './lib/adminAuth';
 import { InstallPrompt } from './components/InstallPrompt';
+import { api } from './api';
 
 export function App() {
   return (
@@ -18,7 +18,6 @@ export function App() {
           <Route path="/" component={Shop} />
           <Route path="/product/:id" component={ProductPage} />
           <Route path="/orders" component={Orders} />
-          <Route path="/admin/login" component={AdminLogin} />
           <Route path="/admin">{() => <AdminGate />}</Route>
           <Route>
             <p className="text-center text-ipe-ink/60">Page not found.</p>
@@ -87,11 +86,50 @@ function Header() {
   );
 }
 
-/// Redirects unauthenticated visitors to /admin/login. Renders the Admin
-/// dashboard when a session is present.
+/// /admin gate based on Privy + the server-side allowlist. Three states:
+///   - not logged in via Privy → CTA to use the Connect button
+///   - logged in but not in admin_emails → friendly "no access" message
+///   - admin → render dashboard
 function AdminGate() {
-  const { session } = useAdminAuth();
-  if (!session) return <Redirect to="/admin/login" />;
+  const { authenticated, ready, login, user } = usePrivy();
+  const meQ = useQuery({
+    queryKey: ['admin-me'],
+    queryFn: api.adminMe,
+    enabled: ready && authenticated,
+    retry: false,
+  });
+
+  if (!ready) return <p className="text-ipe-ink/60">Loading…</p>;
+
+  if (!authenticated) {
+    return (
+      <section className="max-w-md mx-auto py-10 text-center space-y-4">
+        <h1 className="text-2xl font-bold text-ipe-green">Admin sign in</h1>
+        <p className="text-ipe-ink/70 text-sm">
+          Sign in with your email or wallet to access the admin dashboard.
+        </p>
+        <button onClick={() => login()} className="btn-primary">Sign in with Privy</button>
+      </section>
+    );
+  }
+
+  if (meQ.isLoading) return <p className="text-ipe-ink/60">Checking access…</p>;
+
+  if (meQ.isError) {
+    const email = user?.email?.address;
+    return (
+      <section className="max-w-md mx-auto py-10 text-center space-y-3">
+        <h1 className="text-xl font-bold text-ipe-green">No admin access</h1>
+        <p className="text-ipe-ink/70 text-sm">
+          {email ? <>The email <code>{email}</code> isn't on the admin allowlist.</> : 'Your account is not on the admin allowlist.'}
+        </p>
+        <p className="text-ipe-ink/60 text-xs">
+          Ask another admin to add your email, or sign out and try a different account.
+        </p>
+      </section>
+    );
+  }
+
   return <Admin />;
 }
 
