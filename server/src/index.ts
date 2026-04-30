@@ -83,6 +83,24 @@ app.use((err: Error, _req: express.Request, res: express.Response, next: express
   next(err);
 });
 
+/// Catch-all error handler. Without this, an unhandled async throw in any
+/// route handler crashes the Node process (Railway then restarts the
+/// container, causing visible downtime). Always reply with 500 + log.
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('[server] unhandled error:', err);
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'internal server error' });
+});
+
+/// Last-resort process guards — keep the container alive on stray rejections
+/// instead of letting Railway recycle on every glitch. Real bugs still log.
+process.on('unhandledRejection', (reason) => {
+  console.error('[process] unhandledRejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[process] uncaughtException:', err);
+});
+
 // Bind to 0.0.0.0 explicitly — required for Railway/Render/etc. to route the
 // public URL into the container. Defaulting to localhost would silently break
 // healthchecks even though the process is "up".

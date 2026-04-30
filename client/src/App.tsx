@@ -76,43 +76,35 @@ function Header() {
       className="glass border-b border-ipe-stone-200/60 sticky top-0 z-20"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center justify-between sm:gap-8">
-          <Link href="/" className="hover:opacity-80 transition-opacity" aria-label="Ipê Store home">
-            <Logo height={28} />
-          </Link>
-          {/* Inline nav links visible only on desktop; mobile uses BottomNav */}
-          <nav className="hidden sm:flex gap-6 text-sm font-medium">
-            <NavLink href="/" label="Shop" />
-            <NavLink href="/orders" label="My orders" />
-          </nav>
-          {/* On mobile, the connect button sits next to the brand */}
-          <div className="sm:hidden">
-            {authenticated && wallet ? (
-              <button onClick={() => logout()} className="text-2xs font-mono text-ipe-green-700 px-2.5 py-1 rounded-xs bg-ipe-green-100">
-                {wallet.slice(0, 4)}…{wallet.slice(-3)}
-              </button>
-            ) : (
-              <button onClick={() => login()} className="btn-primary text-xs px-3 py-1.5 min-h-0">
-                Connect
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <Link href="/" className="hover:opacity-80 transition-opacity shrink-0" aria-label="Ipê Store home">
+          <Logo height={28} />
+        </Link>
+        {/* Desktop nav links — mobile uses BottomNav */}
+        <nav className="hidden sm:flex gap-6 text-sm font-medium ml-4 mr-auto">
+          <NavLink href="/" label="Shop" />
+          <NavLink href="/orders" label="My orders" />
+        </nav>
+        {/* Theme toggle + connect — same row on every breakpoint */}
+        <div className="flex items-center gap-2">
           <ThemeToggle />
-          {/* Desktop connect button stays in the header */}
-          <div className="hidden sm:block">
-            {authenticated && wallet ? (
-              <button onClick={() => logout()} className="btn-ghost text-xs min-h-0 py-1.5">
-                {wallet.slice(0, 6)}…{wallet.slice(-4)} · disconnect
-              </button>
-            ) : (
-              <button onClick={() => login()} className="btn-primary text-sm min-h-0 py-2">
-                Connect
-              </button>
-            )}
-          </div>
+          {authenticated && wallet ? (
+            <button
+              onClick={() => logout()}
+              className="text-2xs sm:text-xs font-mono px-2.5 py-1.5 rounded-md bg-ipe-navy-100 text-ipe-navy-700 dark:bg-ipe-navy-700/40 dark:text-ipe-cream-100 hover:opacity-90 transition-opacity"
+              title="Click to disconnect"
+            >
+              <span className="sm:hidden">{wallet.slice(0, 4)}…{wallet.slice(-3)}</span>
+              <span className="hidden sm:inline">{wallet.slice(0, 6)}…{wallet.slice(-4)}</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => login()}
+              className="btn-primary text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 min-h-0"
+            >
+              Connect
+            </button>
+          )}
         </div>
       </div>
     </header>
