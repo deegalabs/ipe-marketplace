@@ -26,6 +26,18 @@
     padding-right: env(safe-area-inset-right);
   }
 
+  html.dark body {
+    background:
+      radial-gradient(1200px 600px at 100% -10%, rgba(243, 201, 105, 0.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 100%, rgba(10, 58, 47, 0.4), transparent 60%),
+      theme('colors.ipe.green.800');
+    color: theme('colors.ipe.cream.100');
+  }
+  html.dark ::selection {
+    background: theme('colors.ipe.gold.DEFAULT');
+    color: theme('colors.ipe.green.800');
+  }
+
   ::selection {
     background: theme('colors.ipe.gold.DEFAULT');
     color: theme('colors.ipe.green.DEFAULT');
@@ -64,18 +76,23 @@
   .btn-primary {
     @apply btn bg-ipe-green-600 text-ipe-cream-50
            hover:bg-ipe-green-700 hover:-translate-y-px hover:shadow-md
-           active:translate-y-0 active:shadow-sm;
+           active:translate-y-0 active:shadow-sm
+           dark:bg-ipe-gold-DEFAULT dark:text-ipe-green-800
+           dark:hover:bg-ipe-gold-300;
   }
 
   .btn-ghost {
     @apply btn bg-transparent text-ipe-green-600 border border-ipe-green-600/25
            hover:bg-ipe-green-600/5 hover:border-ipe-green-600/50
-           active:bg-ipe-green-600/10;
+           active:bg-ipe-green-600/10
+           dark:text-ipe-cream-100 dark:border-ipe-cream-100/20
+           dark:hover:bg-ipe-cream-100/5 dark:hover:border-ipe-cream-100/40;
   }
 
   .btn-soft {
     @apply btn bg-ipe-green-600/8 text-ipe-green-700 border border-transparent
-           hover:bg-ipe-green-600/12;
+           hover:bg-ipe-green-600/12
+           dark:bg-ipe-cream-100/10 dark:text-ipe-cream-100;
   }
 
   .btn-gold {
@@ -86,11 +103,13 @@
   /* ── Surfaces ─────────────────────────────────────────────── */
   .card {
     @apply bg-white/95 backdrop-blur-sm rounded-lg border border-ipe-stone-200/60
-           shadow-sm transition-all duration-250 ease-smooth;
+           shadow-sm transition-all duration-250 ease-smooth
+           dark:bg-ipe-green-700/40 dark:border-ipe-green-500/20;
   }
 
   .card-interactive {
-    @apply card hover:shadow-md hover:-translate-y-0.5 hover:border-ipe-stone-300;
+    @apply card hover:shadow-md hover:-translate-y-0.5 hover:border-ipe-stone-300
+           dark:hover:border-ipe-gold-DEFAULT/40;
   }
 
   /* ── Form fields ──────────────────────────────────────────── */
@@ -99,12 +118,16 @@
            text-ipe-ink placeholder:text-ipe-ink-30
            transition-all duration-250 ease-smooth
            focus:outline-none focus:border-ipe-green-600 focus:ring-2 focus:ring-ipe-green-600/15
-           disabled:opacity-50 disabled:cursor-not-allowed;
+           disabled:opacity-50 disabled:cursor-not-allowed
+           dark:bg-ipe-green-800/60 dark:border-ipe-green-500/30 dark:text-ipe-cream-100
+           dark:placeholder:text-ipe-cream-100/30
+           dark:focus:border-ipe-gold-DEFAULT dark:focus:ring-ipe-gold-DEFAULT/20;
     min-height: 44px;
   }
 
   .label {
-    @apply block text-xs font-medium uppercase tracking-wider text-ipe-ink-70 mb-1.5;
+    @apply block text-xs font-medium uppercase tracking-wider text-ipe-ink-70 mb-1.5
+           dark:text-ipe-cream-100/70;
   }
 
   /* ── Badges ───────────────────────────────────────────────── */
@@ -154,5 +177,8 @@
     background: rgba(248, 245, 236, 0.78);
     backdrop-filter: saturate(180%) blur(14px);
     -webkit-backdrop-filter: saturate(180%) blur(14px);
+  }
+  html.dark .glass {
+    background: rgba(4, 26, 22, 0.75);
   }
 }

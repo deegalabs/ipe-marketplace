@@ -7,6 +7,8 @@ import { Orders } from './pages/Orders';
 import { Admin } from './pages/Admin';
 import { CurrencyToggle } from './lib/currency';
 import { InstallPrompt } from './components/InstallPrompt';
+import { Logo } from './components/Logo';
+import { ThemeToggle } from './components/ThemeToggle';
 import { api } from './api';
 
 export function App() {
@@ -44,12 +46,8 @@ function Header() {
     >
       <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center justify-between sm:gap-8">
-          <Link
-            href="/"
-            className="font-display font-bold text-ipe-green-600 text-xl tracking-tight flex items-center gap-1.5"
-          >
-            <span className="text-ipe-gold-DEFAULT">●</span>
-            IPE Store
+          <Link href="/" className="hover:opacity-80 transition-opacity">
+            <Logo />
           </Link>
           {/* Inline nav links visible only on desktop; mobile uses BottomNav */}
           <nav className="hidden sm:flex gap-6 text-sm font-medium">
@@ -71,6 +69,7 @@ function Header() {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
+          <ThemeToggle />
           <CurrencyToggle />
           {/* Desktop connect button stays in the header */}
           <div className="hidden sm:block">

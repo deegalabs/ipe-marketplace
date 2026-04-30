@@ -7,6 +7,7 @@ import { baseSepolia } from 'viem/chains';
 import { App } from './App';
 import { env, wagmiConfig } from './config';
 import { CurrencyProvider } from './lib/currency';
+import { ThemeProvider } from './lib/theme';
 import { setPrivyTokenGetter } from './api';
 import './styles.css';
 
@@ -36,11 +37,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     >
       <QueryClientProvider client={queryClient}>
         <WagmiProvider config={wagmiConfig}>
-          <CurrencyProvider>
-            <PrivyApiBridge>
-              <App />
-            </PrivyApiBridge>
-          </CurrencyProvider>
+          <ThemeProvider>
+            <CurrencyProvider>
+              <PrivyApiBridge>
+                <App />
+              </PrivyApiBridge>
+            </CurrencyProvider>
+          </ThemeProvider>
         </WagmiProvider>
       </QueryClientProvider>
     </PrivyProvider>
