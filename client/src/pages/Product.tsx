@@ -11,6 +11,7 @@ import { ShippingForm, type ShippingFormValues } from '../components/ShippingFor
 import { PickupForm, type PickupFormValues } from '../components/PickupForm';
 import { GatewayCheckout } from '../components/GatewayCheckout';
 import { ProductImage } from '../components/ProductImage';
+import { SkeletonBox, SkeletonText } from '../components/Skeleton';
 
 type Step = 'idle' | 'approving' | 'buying' | 'recording' | 'done';
 
@@ -41,7 +42,7 @@ export function ProductPage() {
   const [step, setStep] = useState<Step>('idle');
   const [error, setError] = useState<string | null>(null);
 
-  if (!product) return <p className="text-ipe-ink/60">Loading…</p>;
+  if (!product) return <ProductSkeleton />;
   const p = product;
   const tokenId = p.tokenId ? BigInt(p.tokenId) : null;
 
@@ -211,6 +212,28 @@ export function ProductPage() {
             onClose={() => setShowGateway(false)}
           />
         )}
+      </div>
+    </article>
+  );
+}
+
+function ProductSkeleton() {
+  return (
+    <article className="grid md:grid-cols-2 gap-6 sm:gap-10">
+      <SkeletonBox className="aspect-square" />
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <SkeletonText className="w-20" />
+          <SkeletonBox className="h-9 w-3/4" />
+          <SkeletonBox className="h-7 w-32" />
+          <div className="space-y-2 pt-2">
+            <SkeletonText className="w-full" />
+            <SkeletonText className="w-5/6" />
+            <SkeletonText className="w-4/6" />
+          </div>
+        </div>
+        <SkeletonBox className="h-24" />
+        <SkeletonBox className="h-11" />
       </div>
     </article>
   );
