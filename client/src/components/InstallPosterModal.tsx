@@ -68,12 +68,15 @@ export function InstallPosterModal({ onClose }: { onClose: () => void }) {
           </p>
         </div>
 
-        {/* ── The poster itself — A4 portrait, print-ready.
-             Wrapper allows horizontal scroll on narrow viewports since
-             the poster is exactly 210mm wide (~794px). On print, the
-             visibility trick bypasses the wrapper entirely. ── */}
-        <div className="px-5 pb-6 overflow-x-auto print:p-0 print:overflow-visible">
-          <div className="poster-page mx-auto shadow-md print:shadow-none flex flex-col">
+        {/* ── The poster — A4 portrait, scaled for preview.
+             The .poster-page itself stays exactly 210×297mm (so print is
+             pixel-perfect A4). The .poster-frame absorbs the scaled visual
+             size so it fits cleanly inside the modal. Print mode resets
+             the transform via the global rule so the actual page renders
+             at full size. ── */}
+        <div className="px-5 pb-6 print:p-0">
+          <div className="poster-frame">
+            <div className="poster-page shadow-md print:shadow-none flex flex-col">
             <div className="px-12 pt-12 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <FlowerMark size={42} className="text-ipe-gold" />
@@ -119,6 +122,7 @@ export function InstallPosterModal({ onClose }: { onClose: () => void }) {
                 </div>
               </div>
             )}
+            </div>
           </div>
         </div>
 
@@ -137,6 +141,27 @@ export function InstallPosterModal({ onClose }: { onClose: () => void }) {
             color: #001627;
             border: 1px solid rgba(220, 223, 221, 0.6);
             border-radius: 0;
+          }
+
+          /* Preview-only: scale the A4 down to fit the modal. The .poster-page
+             keeps its real 210×297mm size so print stays pixel-accurate; the
+             frame absorbs the scaled visual dimensions. */
+          .poster-frame {
+            --preview-scale: 0.4;
+            width: calc(210mm * var(--preview-scale));
+            height: calc(297mm * var(--preview-scale));
+            margin: 0 auto;
+            overflow: hidden;
+          }
+          .poster-frame > .poster-page {
+            transform: scale(var(--preview-scale));
+            transform-origin: top left;
+          }
+          @media (min-width: 700px) {
+            .poster-frame { --preview-scale: 0.65; }
+          }
+          @media (min-width: 1000px) {
+            .poster-frame { --preview-scale: 0.85; }
           }
           html.dark .poster-page {
             --color-ink: 14 14 12;     /* re-flip ink var so text-ipe-ink-* stays dark */
@@ -157,6 +182,11 @@ export function InstallPosterModal({ onClose }: { onClose: () => void }) {
           @media print {
             @page { size: A4 portrait; margin: 0; }
             html, body { margin: 0 !important; padding: 0 !important; background: #eff2f1 !important; }
+            .poster-frame {
+              width: auto !important;
+              height: auto !important;
+              overflow: visible !important;
+            }
             /* Hide everything AND defeat containing-block creators
                (transform / filter / backdrop-filter) so .poster-page can
                position absolutely relative to the page, not an ancestor.
