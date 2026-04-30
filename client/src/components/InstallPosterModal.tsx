@@ -20,12 +20,12 @@ export function InstallPosterModal({ onClose }: { onClose: () => void }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-40 flex items-start justify-center bg-ipe-navy-800/60 backdrop-blur-sm overflow-y-auto print:bg-transparent print:relative print:inset-auto print:overflow-visible"
+      className="fixed inset-0 z-40 flex items-start justify-center bg-ipe-navy-800/60 backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-ipe-cream-50 dark:bg-ipe-navy-800 rounded-xl my-6 w-full max-w-5xl shadow-xl border border-ipe-stone-200 dark:border-ipe-navy-500/40 print:bg-transparent print:my-0 print:max-w-none print:border-0 print:shadow-none print:rounded-none"
+        className="bg-ipe-cream-50 dark:bg-ipe-navy-800 rounded-xl my-6 w-full max-w-5xl shadow-xl border border-ipe-stone-200 dark:border-ipe-navy-500/40"
       >
         <header className="flex items-center justify-between px-5 py-3 border-b border-ipe-stone-200 dark:border-ipe-navy-500/40 print:hidden">
           <h2 className="font-display font-semibold text-ipe-navy-700 dark:text-ipe-cream-100">
@@ -156,7 +156,19 @@ export function InstallPosterModal({ onClose }: { onClose: () => void }) {
 
           @media print {
             @page { size: A4 portrait; margin: 0; }
-            body * { visibility: hidden !important; }
+            html, body { margin: 0 !important; padding: 0 !important; background: #eff2f1 !important; }
+            /* Hide everything AND defeat containing-block creators
+               (transform / filter / backdrop-filter) so .poster-page can
+               position absolutely relative to the page, not an ancestor.
+               Without this the modal's backdrop-blur traps the fixed
+               positioning and the print preview comes out blank. */
+            body * {
+              visibility: hidden !important;
+              transform: none !important;
+              filter: none !important;
+              backdrop-filter: none !important;
+              -webkit-backdrop-filter: none !important;
+            }
             .poster-page, .poster-page * { visibility: visible !important; }
             .poster-page {
               position: absolute !important;
@@ -167,6 +179,8 @@ export function InstallPosterModal({ onClose }: { onClose: () => void }) {
               border: 0 !important;
               background: #eff2f1 !important;
               color: #001627 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
           }
         `}</style>
