@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAccount } from 'wagmi';
+import { usePrivy } from '@privy-io/react-auth';
 import { api } from '../api';
 import type { ProductDTO } from '../api';
 import type { ShippingFormValues } from './ShippingForm';
@@ -33,9 +34,13 @@ interface Props {
 /// never leaves the IPE Store UI.
 export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }: Props) {
   const { address: connected } = useAccount();
+  const { user } = usePrivy();
+  const privyEmail = user?.email?.address ?? '';
   const toast = useToast();
   const [method, setMethod] = useState<GatewayMethod>('pix');
-  const [email, setEmail] = useState('');
+  // Pre-fill from the buyer's Privy account so they don't re-type it every
+  // checkout. Editable in case they want to send the receipt elsewhere.
+  const [email, setEmail] = useState(privyEmail);
   const [wallet, setWallet] = useState(connected ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -189,6 +194,7 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
             setMethod={setMethod}
             email={email}
             setEmail={setEmail}
+            privyFilled={!!privyEmail && email === privyEmail}
             wallet={wallet}
             setWallet={setWallet}
             totalLabel={totalLabel}
@@ -232,6 +238,7 @@ interface FormStepProps {
   setMethod: (m: GatewayMethod) => void;
   email: string;
   setEmail: (v: string) => void;
+  privyFilled: boolean;
   wallet: string;
   setWallet: (v: string) => void;
   totalLabel: string;
@@ -240,7 +247,7 @@ interface FormStepProps {
   onSubmit: () => void;
 }
 
-function FormStep({ method, setMethod, email, setEmail, wallet, setWallet, totalLabel, error, submitting, onSubmit }: FormStepProps) {
+function FormStep({ method, setMethod, email, setEmail, privyFilled, wallet, setWallet, totalLabel, error, submitting, onSubmit }: FormStepProps) {
   return (
     <div className="p-5 space-y-4">
       <fieldset className="space-y-2">
@@ -268,7 +275,10 @@ function FormStep({ method, setMethod, email, setEmail, wallet, setWallet, total
       </fieldset>
 
       <div>
-        <label className="label">Email (required)</label>
+        <label className="label">
+          Email (required)
+          {privyFilled && <span className="ml-2 text-2xs text-ipe-green dark:text-ipe-gold normal-case font-medium tracking-normal">· from your account</span>}
+        </label>
         <input
           className="input"
           type="email"
