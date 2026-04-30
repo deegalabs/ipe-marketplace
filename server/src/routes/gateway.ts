@@ -12,6 +12,7 @@ import {
   getMerchantCoins,
   verifyIpnSignature,
 } from '../services/nowpayments.js';
+import { paymentUriFor } from '../services/cryptoPaymentUri.js';
 import { mintReceiptForGatewayOrder } from '../services/onchain.js';
 import { usdcToBrlCents } from './rates.js';
 import {
@@ -118,8 +119,12 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
           description,
           externalReference: order.id,
         });
-        // Encode just the address — broadest wallet compatibility across coins.
-        const qrCodeBase64 = await QRCode.toDataURL(payment.payAddress, { width: 256, margin: 1 });
+        // Build a structured payment URI (BIP-21 / EIP-681 / Solana Pay) so
+        // payment-intent wallets like Yodl/Rainbow Pay/Daimo can scan and
+        // auto-fill chain + token + amount. Falls back to raw address for
+        // tickers we haven't mapped — those still work with manual-entry wallets.
+        const payUri = paymentUriFor(payment.payCurrency, payment.payAddress, payment.payAmount);
+        const qrCodeBase64 = await QRCode.toDataURL(payUri, { width: 256, margin: 1 });
         const [updated] = await db
           .update(schema.orders)
           .set({
@@ -137,6 +142,7 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
             payAddress: payment.payAddress,
             payAmount: payment.payAmount,
             payCurrency: payment.payCurrency,
+            payUri,
             qrCodeBase64,
             expiresAt: payment.expiresAt,
           },

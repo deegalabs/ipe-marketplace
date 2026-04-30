@@ -14,6 +14,7 @@ interface CryptoPayment {
   payAddress: string;
   payAmount: number;
   payCurrency: string;
+  payUri: string;
   qrCodeBase64: string;
   expiresAt: string | null;
 }
@@ -449,9 +450,17 @@ function CryptoPayView({ crypto, payCurrency }: { crypto: CryptoPayment; payCurr
 
       <img
         src={crypto.qrCodeBase64}
-        alt={`${ticker} address QR`}
+        alt={`${ticker} payment QR`}
         className="mx-auto w-56 h-56 rounded border border-ipe-green/10 bg-white"
       />
+
+      <a
+        href={crypto.payUri}
+        className="btn-ghost w-full text-xs sm:hidden"
+        rel="noreferrer"
+      >
+        Open in wallet
+      </a>
 
       <div>
         <label className="label">Amount</label>

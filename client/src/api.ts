@@ -145,6 +145,9 @@ export const api = {
         payAddress: string;
         payAmount: number;
         payCurrency: string;
+        /// BIP-21 / EIP-681 / Solana Pay URI — same payload encoded into the QR.
+        /// Use as `href` for an "Open in wallet" deep-link button on mobile.
+        payUri: string;
         qrCodeBase64: string;
         expiresAt: string | null;
       };
