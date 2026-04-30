@@ -1,5 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Brand gradient backdrop (blue → green → yellow over navy), per Brand Guide §17 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <radialGradient id="g1" cx="20%" cy="30%" r="60%">
       <stop offset="0%" stop-color="#3AA5FF" stop-opacity="0.7"/>
@@ -14,14 +13,18 @@
       <stop offset="100%" stop-color="#FFB600" stop-opacity="0"/>
     </radialGradient>
   </defs>
+
+  <!-- Brand navy backdrop with rounded corners + 3 brand blobs -->
   <rect width="512" height="512" rx="96" fill="#002642"/>
   <rect width="512" height="512" rx="96" fill="url(#g1)"/>
   <rect width="512" height="512" rx="96" fill="url(#g2)"/>
   <rect width="512" height="512" rx="96" fill="url(#g3)"/>
 
-  <!-- Official chevron symbol (Brand Guide §07), centered + scaled -->
-  <path
-    d="M104 352 L256 184 L408 352 L344 352 L256 256 L168 352 Z"
-    fill="#EFF2F1"
-  />
+  <!-- The "I" letter from the Ipê Store wordmark — chevron at top + curved
+       foot. Source path is from logo-white.svg viewBox 1160×324. The "I"
+       glyph occupies roughly x:0-150, y:88-320 (≈150×232). Scale and center
+       in the 512 canvas. -->
+  <g transform="translate(180 100) scale(1.05)">
+    <path d="M43.4345 262.91V159.589C43.4345 150.704 51.0026 140.833 57.2545 134.581L52.6478 129.974C46.3959 136.226 35.5373 142.807 26.653 142.807C8.88432 142.478 0 133.265 0 115.496C0 97.3984 9.21337 88.5142 27.3111 88.5142H39.4859C52.3188 88.5142 58.8997 94.108 66.4679 110.56C69.7584 117.47 74.365 123.722 80.946 128C96.7404 138.201 102.663 145.769 102.663 156.298V248.761C102.663 261.594 105.954 265.213 118.787 265.542C137.213 265.871 146.098 274.427 146.098 292.524C146.098 310.622 136.884 319.835 118.787 319.835H97.7275C60.874 319.835 43.4345 301.738 43.4345 262.91Z" fill="#EFF2F1"/>
+  </g>
 </svg>
