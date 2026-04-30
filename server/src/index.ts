@@ -94,8 +94,11 @@ app.use((err: Error, _req: express.Request, res: express.Response, next: express
   next(err);
 });
 
-app.listen(env.PORT, async () => {
-  console.log(`[server] listening on :${env.PORT} (env=${env.NODE_ENV})`);
+// Bind to 0.0.0.0 explicitly — required for Railway/Render/etc. to route the
+// public URL into the container. Defaulting to localhost would silently break
+// healthchecks even though the process is "up".
+app.listen(Number(env.PORT), '0.0.0.0', async () => {
+  console.log(`[server] listening on 0.0.0.0:${env.PORT} (env=${env.NODE_ENV})`);
   try {
     await ensureBootstrapAdmin();
   } catch (err) {
