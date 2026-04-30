@@ -166,7 +166,7 @@ function ResumePaymentButton({ order: o }: { order: OrderDTO }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-ipe-green-600 text-ipe-cream-50 hover:bg-ipe-green-700 dark:bg-ipe-gold dark:text-ipe-green-800 dark:hover:bg-ipe-gold-300 transition-all duration-200 shadow-sm hover:shadow"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-ipe-green-600 text-ipe-cream-50 hover:bg-ipe-green-700 dark:bg-ipe-gold dark:!text-ipe-green-800 dark:hover:bg-ipe-gold-300 transition-all duration-200 shadow-sm hover:shadow"
       >
         <QrIcon /> Resume payment
       </button>
