@@ -6,7 +6,7 @@ import { erc20Abi } from 'viem';
 import { IpeMarketAbi } from '@ipe/shared';
 import { api } from '../api';
 import { env, TOKENS, type CryptoToken } from '../config';
-import { priceDisplay, formatToken, formatBrl } from '../lib/format';
+import { priceDisplay, formatToken } from '../lib/format';
 import { ShippingForm, type ShippingFormValues } from '../components/ShippingForm';
 import { PickupForm, type PickupFormValues } from '../components/PickupForm';
 import { GatewayCheckout } from '../components/GatewayCheckout';
@@ -139,7 +139,7 @@ export function ProductPage() {
       default:
         if (paymentMethod === 'ipe') return `Buy for ${formatToken(p.priceIpe, 'IPE')}`;
         if (paymentMethod === 'usdc') return `Buy for ${formatToken(p.priceUsdc, 'USDC')}`;
-        return `Checkout — ${formatBrl(p.priceBrl)}`;
+        return `Checkout — ${priceDisplay(p)}`;
     }
   })();
 
@@ -177,7 +177,6 @@ export function ProductPage() {
                 enabled={enabledMethods}
                 priceIpe={p.priceIpe}
                 priceUsdc={p.priceUsdc}
-                priceBrl={p.priceBrl}
               />
             )}
             <DeliverySelector value={delivery} onChange={setDelivery} enabled={enabledDeliveries} />
@@ -223,14 +222,13 @@ interface PaymentSelectorProps {
   enabled: ('ipe' | 'usdc' | 'gateway')[];
   priceIpe: string;
   priceUsdc: string;
-  priceBrl: string;
 }
 
-function PaymentSelector({ value, onChange, enabled, priceIpe, priceUsdc, priceBrl }: PaymentSelectorProps) {
+function PaymentSelector({ value, onChange, enabled, priceIpe, priceUsdc }: PaymentSelectorProps) {
   const opts = [
     { id: 'ipe' as const, label: 'IPE', sub: 'Direct onchain', price: BigInt(priceIpe) > 0n ? formatToken(priceIpe, 'IPE') : '—' },
     { id: 'usdc' as const, label: 'USDC', sub: 'Direct onchain', price: BigInt(priceUsdc) > 0n ? formatToken(priceUsdc, 'USDC') : '—' },
-    { id: 'gateway' as const, label: 'Pay with anything else', sub: 'PIX or any crypto', price: BigInt(priceBrl) > 0n ? formatBrl(priceBrl) : '—' },
+    { id: 'gateway' as const, label: 'Pay with anything else', sub: 'PIX or any crypto', price: BigInt(priceUsdc) > 0n ? formatToken(priceUsdc, 'USDC') : '—' },
   ];
   return (
     <fieldset className="space-y-2">
