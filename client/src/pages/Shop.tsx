@@ -108,14 +108,8 @@ function ProductCard({ product, index }: { product: ProductDTO; index: number })
           aria-hidden
           className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-350"
         />
-        {/* Status badges, top-left */}
-        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1">
-          {product.tokenId === null && (
-            <span className="badge bg-amber-100/95 text-amber-800 backdrop-blur">offline</span>
-          )}
-        </div>
-        {/* Category eyebrow, top-right */}
-        <span className="absolute top-2.5 right-2.5 text-2xs font-semibold uppercase tracking-widest text-white/90 px-2 py-0.5 rounded-xs bg-ipe-ink/40 backdrop-blur opacity-0 group-hover:opacity-100 transition-opacity duration-350">
+        {/* Category eyebrow, top-left — always visible. */}
+        <span className="absolute top-2.5 left-2.5 text-2xs font-semibold uppercase tracking-widest text-white/90 px-2 py-0.5 rounded-xs bg-ipe-ink/40 backdrop-blur">
           {product.category}
         </span>
       </div>
