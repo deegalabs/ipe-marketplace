@@ -11,6 +11,7 @@ import { gatewayRouter } from './routes/gateway.js';
 import { adminAuthRouter } from './routes/admin-auth.js';
 import { startIndexer } from './indexer.js';
 import { ensureBootstrapAdmin } from './services/auth.js';
+import { startOrderSweeper } from './services/orderSweeper.js';
 
 const app = express();
 
@@ -116,4 +117,5 @@ app.listen(Number(env.PORT), '0.0.0.0', async () => {
   } else {
     console.log('[indexer] disabled via DISABLE_INDEXER');
   }
+  startOrderSweeper();
 });
