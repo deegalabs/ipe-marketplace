@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
+import { usePrivy } from '@privy-io/react-auth';
 import { erc20Abi } from 'viem';
 import { IpeMarketAbi } from '@ipe/shared';
 import { api } from '../api';
@@ -24,6 +25,7 @@ export function ProductPage() {
   });
 
   const { address } = useAccount();
+  const { authenticated, login } = usePrivy();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
 
@@ -126,6 +128,13 @@ export function ProductPage() {
 
   async function submit() {
     if (paymentMethod === 'gateway') {
+      // Force a Privy login (email or wallet) before opening the checkout.
+      // Lets us prefill email/wallet on the form and ties every order to a
+      // verified identity instead of a free-text email field.
+      if (!authenticated) {
+        login();
+        return;
+      }
       setShowGateway(true);
       return;
     }
@@ -140,6 +149,7 @@ export function ProductPage() {
       default:
         if (paymentMethod === 'ipe') return `Buy for ${formatToken(p.priceIpe, 'IPE')}`;
         if (paymentMethod === 'usdc') return `Buy for ${formatToken(p.priceUsdc, 'USDC')}`;
+        if (!authenticated) return 'Sign in to checkout';
         return `Checkout — ${priceDisplay(p)}`;
     }
   })();

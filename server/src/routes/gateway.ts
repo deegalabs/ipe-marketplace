@@ -13,6 +13,7 @@ import {
   verifyIpnSignature,
 } from '../services/nowpayments.js';
 import { paymentUriFor } from '../services/cryptoPaymentUri.js';
+import { roundUpCryptoAmount } from '../services/cryptoAmount.js';
 import { mintReceiptForGatewayOrder } from '../services/onchain.js';
 import { usdcToBrlCents } from './rates.js';
 import {
@@ -119,18 +120,22 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
           description,
           externalReference: order.id,
         });
+        // Round the crypto amount up to a typeable precision (2 decimals for
+        // stablecoins, 4–6 for others). Buyer pays exact rounded value;
+        // NOWPayments accepts the small overpay vs the precise amount.
+        const roundedAmount = roundUpCryptoAmount(payment.payAmount, payment.payCurrency);
         // Build a structured payment URI (BIP-21 / EIP-681 / Solana Pay) so
-        // payment-intent wallets like Yodl/Rainbow Pay/Daimo can scan and
-        // auto-fill chain + token + amount. Falls back to raw address for
-        // tickers we haven't mapped — those still work with manual-entry wallets.
-        const payUri = paymentUriFor(payment.payCurrency, payment.payAddress, payment.payAmount);
+        // payment-intent wallets like Rainbow Pay/Daimo can scan and auto-fill
+        // chain + token + amount. Falls back to raw address for tickers we
+        // haven't mapped — those still work with manual-entry wallets.
+        const payUri = paymentUriFor(payment.payCurrency, payment.payAddress, roundedAmount);
         const qrCodeBase64 = await QRCode.toDataURL(payUri, { width: 256, margin: 1 });
         const [updated] = await db
           .update(schema.orders)
           .set({
             paymentRef: payment.paymentId,
             cryptoPayAddress: payment.payAddress,
-            cryptoPayAmount: String(payment.payAmount),
+            cryptoPayAmount: String(roundedAmount),
             cryptoPayCurrency: payment.payCurrency,
             cryptoPayUri: payUri,
             cryptoQrCodeBase64: qrCodeBase64,
@@ -145,7 +150,7 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
           provider: 'nowpayments',
           crypto: {
             payAddress: payment.payAddress,
-            payAmount: payment.payAmount,
+            payAmount: roundedAmount,
             payCurrency: payment.payCurrency,
             payUri,
             qrCodeBase64,
