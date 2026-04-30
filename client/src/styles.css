@@ -144,9 +144,11 @@
     @apply btn bg-ipe-green-600 text-ipe-cream-50
            hover:bg-ipe-green-700 hover:-translate-y-px hover:shadow-md
            active:translate-y-0 active:shadow-sm
-           dark:bg-ipe-gold dark:text-ipe-green-800
-           dark:hover:bg-ipe-gold-300;
+           dark:bg-ipe-gold dark:hover:bg-ipe-gold-300;
   }
+  /* Dark text inline as raw CSS — the global text-ipe-green-* override in
+     @layer base would otherwise hijack the @apply dark:text-* utility. */
+  html.dark .btn-primary { color: theme('colors.ipe.navy.700'); }
 
   .btn-ghost {
     @apply btn bg-transparent text-ipe-green-600 border border-ipe-green-600/25
@@ -179,8 +181,9 @@
   .action-btn-primary {
     @apply action-btn bg-ipe-green-600 text-ipe-cream-50
            hover:bg-ipe-green-700 shadow-sm hover:shadow
-           dark:bg-ipe-gold dark:!text-ipe-green-800 dark:hover:bg-ipe-gold-300;
+           dark:bg-ipe-gold dark:hover:bg-ipe-gold-300;
   }
+  html.dark .action-btn-primary { color: theme('colors.ipe.navy.700'); }
   .action-btn-ghost {
     @apply action-btn border border-ipe-stone-200 text-ipe-ink-70
            hover:border-ipe-stone-300 hover:text-ipe-ink hover:bg-ipe-stone-50
