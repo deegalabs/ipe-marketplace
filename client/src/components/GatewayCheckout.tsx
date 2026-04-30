@@ -6,7 +6,6 @@ import { api } from '../api';
 import type { ProductDTO } from '../api';
 import type { ShippingFormValues } from './ShippingForm';
 import type { PickupFormValues } from './PickupForm';
-import { formatBrl } from '../lib/format';
 
 type GatewayMethod = 'pix' | 'crypto-gateway';
 
@@ -39,10 +38,21 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
     refetchInterval: (q) => (q.state.data?.status === 'awaiting_payment' ? 3000 : false),
   });
 
-  const totalLabel =
-    method === 'pix'
-      ? formatBrl(BigInt(product.priceBrl) * BigInt(1))
-      : `~$${(Number(BigInt(product.priceUsdc)) / 1e6).toFixed(2)} USD`;
+  // Live USD↔BRL rate for the PIX preview total. Server does the same conversion
+  // authoritatively at order-creation time — this is just so the buyer sees the
+  // amount before they click "Generate PIX QR".
+  const { data: rates } = useQuery({
+    queryKey: ['rates'],
+    queryFn: api.rates,
+    refetchInterval: 60_000,
+    enabled: method === 'pix',
+  });
+
+  const usdAmount = Number(BigInt(product.priceUsdc)) / 1e6;
+  const brlPreview = rates?.usdcBrl
+    ? `R$ ${(usdAmount * Number(rates.usdcBrl)).toFixed(2).replace('.', ',')}`
+    : '…';
+  const totalLabel = method === 'pix' ? brlPreview : `~$${usdAmount.toFixed(2)} USD`;
 
   async function submit() {
     if (!email) { setError('Email is required.'); return; }

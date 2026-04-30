@@ -7,6 +7,7 @@ import { features } from '../env.js';
 import { createPixCharge, getPayment, verifyWebhookSignature } from '../services/mercadopago.js';
 import { createInvoice, verifyIpnSignature } from '../services/nowpayments.js';
 import { mintReceiptForGatewayOrder } from '../services/onchain.js';
+import { usdcToBrlCents } from './rates.js';
 import {
   sendOrderCreated,
   sendOrderPaid,
@@ -33,15 +34,21 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
     return res.status(503).json({ error: 'crypto-gateway is not configured on this server' });
   }
 
-  /// PIX uses BRL cents stored on the product. crypto-gateway charges in USD,
-  /// derived from the USDC price (1 USDC ≈ 1 USD).
-  const totalPaid =
-    parsed.data.paymentMethod === 'pix'
-      ? product.priceBrl * BigInt(parsed.data.quantity)
-      : BigInt(product.priceUsdc) * BigInt(parsed.data.quantity);
+  /// USD is the canonical price (priceUsdc, USDC=1:1=USD). Conversion to BRL
+  /// happens at order-creation time using live rates so admins only set USD.
+  let totalPaid: bigint;
+  if (parsed.data.paymentMethod === 'pix') {
+    const conv = await usdcToBrlCents(BigInt(product.priceUsdc), BigInt(parsed.data.quantity));
+    totalPaid = conv.cents;
+    if (conv.source === 'fallback') {
+      console.warn(`[gateway] PIX rate from fallback (CoinGecko down) — order ${parsed.data.productId}`);
+    }
+  } else {
+    totalPaid = BigInt(product.priceUsdc) * BigInt(parsed.data.quantity);
+  }
 
   if (totalPaid === 0n) {
-    return res.status(400).json({ error: 'this product is not enabled for the chosen payment method' });
+    return res.status(400).json({ error: 'this product is not priced (set a USD price in admin first)' });
   }
 
   const provider = parsed.data.paymentMethod === 'pix' ? 'mercadopago' : 'nowpayments';

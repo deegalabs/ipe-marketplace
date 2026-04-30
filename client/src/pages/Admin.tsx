@@ -80,10 +80,10 @@ interface ProductDraft {
   description: string;
   category: 't-shirt' | 'hoodie' | 'cup' | 'cap' | 'other';
   imageUrl: string;
-  /// Display strings — converted to smallest unit on submit.
-  priceIpe: string;
-  priceUsdc: string;
-  priceBrl: string;     // human input "150" → 15000 cents
+  /// Single canonical price in USD (human input, e.g. "29.90"). Stored as
+  /// priceUsdc on save; PIX/BRL conversion happens live at checkout via the
+  /// rates endpoint, so admins don't have to maintain three numbers.
+  priceUsd: string;
   maxSupply: string;
   royaltyBps: number;
   physicalStock: number;
@@ -96,14 +96,12 @@ const EMPTY_DRAFT: ProductDraft = {
   description: '',
   category: 't-shirt',
   imageUrl: '',
-  priceIpe: '50',
-  priceUsdc: '30',
-  priceBrl: '150',
+  priceUsd: '',
   maxSupply: '0',
   royaltyBps: 500,
   physicalStock: 0,
   pickupAvailable: true,
-  shippingAvailable: true,
+  shippingAvailable: false,
 };
 
 function draftFromProduct(p: ProductDTO): ProductDraft {
@@ -112,9 +110,7 @@ function draftFromProduct(p: ProductDTO): ProductDraft {
     description: p.description,
     category: p.category as ProductDraft['category'],
     imageUrl: p.imageUrl,
-    priceIpe: BigInt(p.priceIpe) > 0n ? formatUnits(BigInt(p.priceIpe), 18) : '0',
-    priceUsdc: BigInt(p.priceUsdc) > 0n ? formatUnits(BigInt(p.priceUsdc), 6) : '0',
-    priceBrl: BigInt(p.priceBrl) > 0n ? (Number(BigInt(p.priceBrl)) / 100).toFixed(2) : '0',
+    priceUsd: BigInt(p.priceUsdc) > 0n ? formatUnits(BigInt(p.priceUsdc), 6) : '',
     maxSupply: p.maxSupply,
     royaltyBps: p.royaltyBps,
     physicalStock: p.physicalStock,
@@ -234,20 +230,14 @@ function ProductsCard({ products }: { products: ProductDTO[] }) {
                 Edit
               </button>
             </div>
-            <dl className="grid grid-cols-3 gap-2 mt-3 text-xs">
-              <div><dt className="text-ipe-ink/50">IPE</dt><dd>{BigInt(p.priceIpe) > 0n ? formatToken(p.priceIpe, 'IPE') : '—'}</dd></div>
-              <div><dt className="text-ipe-ink/50">USDC</dt><dd>{BigInt(p.priceUsdc) > 0n ? formatToken(p.priceUsdc, 'USDC') : '—'}</dd></div>
-              <div><dt className="text-ipe-ink/50">BRL</dt><dd>{BigInt(p.priceBrl) > 0n ? formatBrl(p.priceBrl) : '—'}</dd></div>
-            </dl>
+            <p className="text-sm mt-2">
+              <span className="text-ipe-ink/50 text-xs uppercase tracking-wider mr-1">USD</span>
+              {BigInt(p.priceUsdc) > 0n ? `$${(Number(p.priceUsdc) / 1e6).toFixed(2)}` : '—'}
+            </p>
             <div className="flex flex-wrap gap-2 mt-3">
               {!p.tokenId && (
                 <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => pushOnchain(p)}>
                   {busyId === p.id ? 'Pushing…' : 'Push onchain'}
-                </button>
-              )}
-              {p.tokenId && BigInt(p.priceIpe) > 0n && (
-                <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'ipe')}>
-                  Sync IPE
                 </button>
               )}
               {p.tokenId && BigInt(p.priceUsdc) > 0n && (
@@ -266,9 +256,7 @@ function ProductsCard({ products }: { products: ProductDTO[] }) {
             <tr>
               <th className="py-2">Product</th>
               <th>Onchain</th>
-              <th>IPE</th>
-              <th>USDC</th>
-              <th>BRL</th>
+              <th>Price (USD)</th>
               <th>Stock</th>
               <th>Active</th>
               <th></th>
@@ -279,9 +267,7 @@ function ProductsCard({ products }: { products: ProductDTO[] }) {
               <tr key={p.id} className="border-t border-ipe-green/10">
                 <td className="py-2">{p.name}</td>
                 <td>{p.tokenId ? <span className="text-green-700">#{p.tokenId}</span> : <span className="text-amber-700">offline</span>}</td>
-                <td>{BigInt(p.priceIpe) > 0n ? formatToken(p.priceIpe, 'IPE') : '—'}</td>
-                <td>{BigInt(p.priceUsdc) > 0n ? formatToken(p.priceUsdc, 'USDC') : '—'}</td>
-                <td>{BigInt(p.priceBrl) > 0n ? formatBrl(p.priceBrl) : '—'}</td>
+                <td>{BigInt(p.priceUsdc) > 0n ? `$${(Number(p.priceUsdc) / 1e6).toFixed(2)}` : '—'}</td>
                 <td>{p.physicalStock}</td>
                 <td>{p.active ? '✓' : '—'}</td>
                 <td className="space-x-2 whitespace-nowrap">
@@ -291,11 +277,6 @@ function ProductsCard({ products }: { products: ProductDTO[] }) {
                   {!p.tokenId && (
                     <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => pushOnchain(p)}>
                       {busyId === p.id ? 'Pushing…' : 'Push onchain'}
-                    </button>
-                  )}
-                  {p.tokenId && BigInt(p.priceIpe) > 0n && (
-                    <button className="btn-ghost text-xs" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'ipe')}>
-                      Sync IPE
                     </button>
                   )}
                   {p.tokenId && BigInt(p.priceUsdc) > 0n && (
@@ -323,24 +304,10 @@ interface ProductFormProps {
 }
 
 function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormProps) {
-  const { data: rates } = useQuery({ queryKey: ['rates'], queryFn: api.rates, refetchInterval: 60_000 });
   const toast = useToast();
   const [draft, setDraft] = useState<ProductDraft>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  function suggestPrices() {
-    if (!rates?.ipeUsd || !rates.usdcBrl) {
-      toast.info('Rates not ready', 'Try again in a moment — CoinGecko refresh pending.');
-      return;
-    }
-    const brl = Number(draft.priceBrl);
-    const usdcPerBrl = 1 / Number(rates.usdcBrl);
-    const usdc = brl * usdcPerBrl;
-    const ipe = usdc / Number(rates.ipeUsd);
-    setDraft({ ...draft, priceUsdc: usdc.toFixed(2), priceIpe: ipe.toFixed(2) });
-    toast.success('Prices suggested', `IPE ${ipe.toFixed(2)} · USDC ${usdc.toFixed(2)}`);
-  }
 
   async function save() {
     if (!draft.name.trim()) {
@@ -351,14 +318,15 @@ function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormP
     setError(null);
     setSaving(true);
     try {
+      const { priceUsd, ...rest } = draft;
       const body = {
-        ...draft,
+        ...rest,
         name: draft.name.trim(),
         description: draft.description?.trim() ?? '',
         imageUrl: draft.imageUrl?.trim() ?? '',
-        priceIpe: parseUnits(draft.priceIpe || '0', 18).toString(),
-        priceUsdc: parseUnits(draft.priceUsdc || '0', 6).toString(),
-        priceBrl: BigInt(Math.round(Number(draft.priceBrl || '0') * 100)).toString(),
+        priceUsdc: parseUnits(priceUsd || '0', 6).toString(),
+        priceIpe: '0',
+        priceBrl: '0',
         maxSupply: draft.maxSupply || '0',
       };
       if (mode === 'new') {
@@ -397,21 +365,20 @@ function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormP
         </select>
         <input className="input" placeholder="Max supply (0 = ∞)" value={draft.maxSupply} onChange={(e) => setDraft({ ...draft, maxSupply: e.target.value })} />
 
-        <div>
-          <label className="label">Price IPE</label>
-          <input className="input" value={draft.priceIpe} onChange={(e) => setDraft({ ...draft, priceIpe: e.target.value })} />
+        <div className="sm:col-span-2">
+          <label className="label">Price (USD)</label>
+          <input
+            className="input"
+            type="number"
+            step="0.01"
+            placeholder="29.90"
+            value={draft.priceUsd}
+            onChange={(e) => setDraft({ ...draft, priceUsd: e.target.value })}
+          />
+          <p className="text-[11px] text-ipe-ink-50 mt-1">
+            One canonical price. Crypto pays at this USDC amount; PIX is converted to BRL live at checkout via CoinGecko.
+          </p>
         </div>
-        <div>
-          <label className="label">Price USDC</label>
-          <input className="input" value={draft.priceUsdc} onChange={(e) => setDraft({ ...draft, priceUsdc: e.target.value })} />
-        </div>
-        <div>
-          <label className="label">Price BRL (R$)</label>
-          <input className="input" value={draft.priceBrl} onChange={(e) => setDraft({ ...draft, priceBrl: e.target.value })} />
-        </div>
-        <button type="button" className="btn-ghost text-xs self-end" onClick={suggestPrices}>
-          Suggest from BRL using live rates
-        </button>
 
         <input className="input" type="number" placeholder="Royalty bps" value={draft.royaltyBps} onChange={(e) => setDraft({ ...draft, royaltyBps: Number(e.target.value) })} />
         <input className="input" type="number" placeholder="Physical stock" value={draft.physicalStock} onChange={(e) => setDraft({ ...draft, physicalStock: Number(e.target.value) })} />
@@ -427,8 +394,8 @@ function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormP
 
         {mode === 'edit' && (
           <p className="sm:col-span-2 text-xs text-amber-700">
-            Editing prices off-chain only. Once saved, click <strong>Sync IPE</strong> / <strong>Sync USDC</strong>
-            on the row to push the new price to the contract (owner-only tx).
+            Price changes are off-chain. If this product is already onchain, click <strong>Sync USDC</strong> on
+            the row after saving to push the new price to the contract (owner-only tx).
           </p>
         )}
         {error && <p className="sm:col-span-2 text-sm text-red-700">{error}</p>}
