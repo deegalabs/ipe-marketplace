@@ -355,7 +355,18 @@ interface ConfirmationViewProps {
 }
 
 function ConfirmationView({ method, pix, crypto, checkoutUrl, payCurrency, status, orderId, onClose }: ConfirmationViewProps) {
+  const toast = useToast();
+  const [pixCopied, setPixCopied] = useState(false);
   const isLocalhost = typeof window !== 'undefined' && /localhost|127\.0\.0\.1/.test(window.location.hostname);
+
+  function copyPix() {
+    if (!pix?.qrCode) return;
+    void navigator.clipboard.writeText(pix.qrCode).then(() => {
+      setPixCopied(true);
+      toast.success('PIX code copied', 'Paste in your bank app');
+      setTimeout(() => setPixCopied(false), 2000);
+    });
+  }
 
   if (status === 'paid') {
     return (
@@ -380,16 +391,25 @@ function ConfirmationView({ method, pix, crypto, checkoutUrl, payCurrency, statu
             alt="PIX QR code"
             className="mx-auto w-56 h-56 rounded border border-ipe-green/10"
           />
-          <details>
-            <summary className="text-sm text-ipe-green cursor-pointer">Or copy &amp; paste</summary>
-            <textarea
-              readOnly
-              className="input mt-2 font-mono text-xs"
-              rows={3}
-              value={pix.qrCode}
-              onClick={(e) => (e.target as HTMLTextAreaElement).select()}
-            />
-          </details>
+          <div>
+            <label className="label">Or copy &amp; paste</label>
+            <div className="flex gap-2">
+              <textarea
+                readOnly
+                className="input font-mono text-xs flex-1 resize-none"
+                rows={2}
+                value={pix.qrCode}
+                onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+              />
+              <button
+                type="button"
+                onClick={copyPix}
+                className="action-btn-ghost shrink-0"
+              >
+                {pixCopied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </div>
         </>
       )}
 
