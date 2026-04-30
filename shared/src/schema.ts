@@ -39,22 +39,25 @@ export const productSchema = z.object({
 });
 export type Product = z.infer<typeof productSchema>;
 
-export const productInputSchema = productSchema
-  .pick({
-    name: true,
-    description: true,
-    category: true,
-    imageUrl: true,
-    priceIpe: true,
-    priceUsdc: true,
-    priceBrl: true,
-    maxSupply: true,
-    royaltyBps: true,
-    physicalStock: true,
-    pickupAvailable: true,
-    shippingAvailable: true,
-  })
-  .extend({ active: z.boolean().default(true) });
+/// Input for POST /products and PATCH /products/:id. Mostly mirrors the catalog
+/// schema but with sensible defaults so admins can create a draft without
+/// filling every field upfront.
+export const productInputSchema = z.object({
+  name: z.string().min(1, 'Product needs a name').max(120),
+  description: z.string().max(2_000).default(''),
+  category: productCategoryEnum,
+  /// Image URL is optional at creation — admin can upload/paste later via edit.
+  imageUrl: z.string().url('Enter a valid URL or leave empty').or(z.literal('')).default(''),
+  priceIpe: z.bigint().default(0n),
+  priceUsdc: z.bigint().default(0n),
+  priceBrl: z.bigint().default(0n),
+  maxSupply: z.bigint().default(0n),
+  royaltyBps: z.number().int().min(0).max(1_000).default(500),
+  physicalStock: z.number().int().min(0).default(0),
+  pickupAvailable: z.boolean().default(true),
+  shippingAvailable: z.boolean().default(false),
+  active: z.boolean().default(true),
+});
 export type ProductInput = z.infer<typeof productInputSchema>;
 
 export const orderStatusEnum = z.enum([

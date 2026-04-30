@@ -8,6 +8,7 @@ import { api, type ProductDTO, type OrderDTO, type AdminUserDTO } from '../api';
 import { env } from '../config';
 import { formatToken, formatBrl } from '../lib/format';
 import { normalizeImageUrl } from '../lib/imageUrl';
+import { useToast } from '../lib/toast';
 
 export function Admin() {
   const { user, logout } = usePrivy();
@@ -126,6 +127,7 @@ function ProductsCard({ products }: { products: ProductDTO[] }) {
   const qc = useQueryClient();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
+  const toast = useToast();
   const [busyId, setBusyId] = useState<string | null>(null);
   /// null = closed, 'new' = creating, '<uuid>' = editing that product
   const [editing, setEditing] = useState<string | 'new' | null>(null);
@@ -160,7 +162,12 @@ function ProductsCard({ products }: { products: ProductDTO[] }) {
       if (tokenId !== null) {
         await api.setProductTokenId(p.id, tokenId);
         await qc.invalidateQueries({ queryKey: ['products'] });
+        toast.success('Pushed onchain', `${p.name} → tokenId #${tokenId}`);
+      } else {
+        toast.error('Push failed', 'Transaction succeeded but no ProductListed event detected');
       }
+    } catch (err) {
+      toast.error('Push onchain failed', err instanceof Error ? err.message : String(err));
     } finally {
       setBusyId(null);
     }
@@ -181,6 +188,9 @@ function ProductsCard({ products }: { products: ProductDTO[] }) {
         args: [BigInt(p.tokenId), tokenAddr, newPrice],
       });
       await publicClient.waitForTransactionReceipt({ hash });
+      toast.success(`${token.toUpperCase()} price synced`, p.name);
+    } catch (err) {
+      toast.error('Sync failed', err instanceof Error ? err.message : String(err));
     } finally {
       setBusyId(null);
     }
@@ -314,13 +324,14 @@ interface ProductFormProps {
 
 function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormProps) {
   const { data: rates } = useQuery({ queryKey: ['rates'], queryFn: api.rates, refetchInterval: 60_000 });
+  const toast = useToast();
   const [draft, setDraft] = useState<ProductDraft>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function suggestPrices() {
     if (!rates?.ipeUsd || !rates.usdcBrl) {
-      alert('Rates not ready — try again in a moment.');
+      toast.info('Rates not ready', 'Try again in a moment — CoinGecko refresh pending.');
       return;
     }
     const brl = Number(draft.priceBrl);
@@ -328,24 +339,40 @@ function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormP
     const usdc = brl * usdcPerBrl;
     const ipe = usdc / Number(rates.ipeUsd);
     setDraft({ ...draft, priceUsdc: usdc.toFixed(2), priceIpe: ipe.toFixed(2) });
+    toast.success('Prices suggested', `IPE ${ipe.toFixed(2)} · USDC ${usdc.toFixed(2)}`);
   }
 
   async function save() {
+    if (!draft.name.trim()) {
+      setError('Product name is required.');
+      toast.error('Missing name', 'Enter a product name before saving.');
+      return;
+    }
     setError(null);
     setSaving(true);
     try {
       const body = {
         ...draft,
+        name: draft.name.trim(),
+        description: draft.description?.trim() ?? '',
+        imageUrl: draft.imageUrl?.trim() ?? '',
         priceIpe: parseUnits(draft.priceIpe || '0', 18).toString(),
         priceUsdc: parseUnits(draft.priceUsdc || '0', 6).toString(),
         priceBrl: BigInt(Math.round(Number(draft.priceBrl || '0') * 100)).toString(),
         maxSupply: draft.maxSupply || '0',
       };
-      if (mode === 'new') await api.createProduct({ ...body, active: true });
-      else await api.updateProduct(targetId!, body);
+      if (mode === 'new') {
+        await api.createProduct({ ...body, active: true });
+        toast.success('Product created', body.name);
+      } else {
+        await api.updateProduct(targetId!, body);
+        toast.success('Product updated', body.name);
+      }
       await onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'save failed');
+      const msg = err instanceof Error ? err.message : 'save failed';
+      setError(msg);
+      toast.error('Could not save product', msg);
     } finally {
       setSaving(false);
     }
@@ -415,11 +442,17 @@ function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormP
 
 function OrdersCard({ orders, products }: { orders: OrderDTO[]; products: ProductDTO[] }) {
   const qc = useQueryClient();
+  const toast = useToast();
   const productById = new Map(products.map((p) => [p.id, p] as const));
 
   async function setStatus(id: string, status: string) {
-    await api.updateOrder(id, { status });
-    await qc.invalidateQueries({ queryKey: ['admin-orders'] });
+    try {
+      await api.updateOrder(id, { status });
+      await qc.invalidateQueries({ queryKey: ['admin-orders'] });
+      toast.success('Order updated', `Status → ${status}`);
+    } catch (err) {
+      toast.error('Update failed', err instanceof Error ? err.message : String(err));
+    }
   }
 
   return (
@@ -587,6 +620,7 @@ function ImageUrlField({ value, onChange }: { value: string; onChange: (v: strin
 /// without losing history. Self-deactivation is blocked server-side.
 function AdminsCard({ currentAdminId }: { currentAdminId: string | undefined }) {
   const qc = useQueryClient();
+  const toast = useToast();
   const adminsQ = useQuery({ queryKey: ['admins'], queryFn: api.listAdmins });
   const [newEmail, setNewEmail] = useState('');
   const [newName, setNewName] = useState('');
@@ -598,20 +632,28 @@ function AdminsCard({ currentAdminId }: { currentAdminId: string | undefined }) 
     setBusy(true);
     setError(null);
     try {
-      await api.addAdmin({ email: newEmail.trim(), name: newName.trim() || undefined });
+      const created = await api.addAdmin({ email: newEmail.trim(), name: newName.trim() || undefined });
       setNewEmail('');
       setNewName('');
       await qc.invalidateQueries({ queryKey: ['admins'] });
+      toast.success('Admin added', created.email);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'failed to add admin');
+      const msg = err instanceof Error ? err.message : 'failed to add admin';
+      setError(msg);
+      toast.error('Could not add admin', msg);
     } finally {
       setBusy(false);
     }
   }
 
   async function toggle(a: AdminUserDTO) {
-    await api.updateAdmin(a.id, { active: !a.active });
-    await qc.invalidateQueries({ queryKey: ['admins'] });
+    try {
+      await api.updateAdmin(a.id, { active: !a.active });
+      await qc.invalidateQueries({ queryKey: ['admins'] });
+      toast.success(a.active ? 'Admin deactivated' : 'Admin reactivated', a.email);
+    } catch (err) {
+      toast.error('Update failed', err instanceof Error ? err.message : String(err));
+    }
   }
 
   async function remove(a: AdminUserDTO) {
@@ -619,8 +661,9 @@ function AdminsCard({ currentAdminId }: { currentAdminId: string | undefined }) 
     try {
       await api.removeAdmin(a.id);
       await qc.invalidateQueries({ queryKey: ['admins'] });
+      toast.success('Admin removed', a.email);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'failed to remove');
+      toast.error('Could not remove admin', err instanceof Error ? err.message : String(err));
     }
   }
 

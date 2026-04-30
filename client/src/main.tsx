@@ -7,6 +7,7 @@ import { baseSepolia } from 'viem/chains';
 import { App } from './App';
 import { env, wagmiConfig } from './config';
 import { ThemeProvider } from './lib/theme';
+import { ToastProvider } from './lib/toast';
 import { setPrivyTokenGetter } from './api';
 import './styles.css';
 
@@ -37,9 +38,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <WagmiProvider config={wagmiConfig}>
           <ThemeProvider>
-            <PrivyApiBridge>
-              <App />
-            </PrivyApiBridge>
+            <ToastProvider>
+              <PrivyApiBridge>
+                <App />
+              </PrivyApiBridge>
+            </ToastProvider>
           </ThemeProvider>
         </WagmiProvider>
       </QueryClientProvider>

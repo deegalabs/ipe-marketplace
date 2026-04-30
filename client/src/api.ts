@@ -26,10 +26,26 @@ async function request<T>(path: string, init?: RequestOpts): Promise<T> {
   const res = await fetch(`${env.apiUrl}${path}`, { ...init, headers });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: unknown };
-    const msg = typeof body.error === 'string' ? body.error : `${res.status} ${res.statusText}`;
-    throw new Error(msg);
+    throw new Error(extractError(body.error, res));
   }
   return res.json() as Promise<T>;
+}
+
+/// Squeeze a useful message out of either a plain string error, a zod
+/// fieldErrors blob ({ fieldErrors: { name: ['Required'] } }), or formErrors.
+function extractError(error: unknown, res: Response): string {
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object') {
+    const e = error as { fieldErrors?: Record<string, string[]>; formErrors?: string[] };
+    if (e.fieldErrors) {
+      const lines = Object.entries(e.fieldErrors)
+        .filter(([, msgs]) => msgs && msgs.length > 0)
+        .map(([field, msgs]) => `${field}: ${msgs.join(', ')}`);
+      if (lines.length) return lines.join('\n');
+    }
+    if (e.formErrors && e.formErrors.length) return e.formErrors.join(', ');
+  }
+  return `${res.status} ${res.statusText}`;
 }
 
 export interface ProductDTO {
