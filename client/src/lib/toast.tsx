@@ -62,7 +62,9 @@ function ToastViewport({ toasts, dismiss }: { toasts: Toast[]; dismiss: (id: str
     <div
       className="fixed z-50 flex flex-col gap-3 pointer-events-none"
       style={{
-        top: 'calc(env(safe-area-inset-top) + 24px)',
+        // Header is sticky (~64px content + safe-area) — push the viewport
+        // below it so toasts never overlap the brand chrome.
+        top: 'calc(env(safe-area-inset-top) + 76px)',
         right: 'calc(env(safe-area-inset-right) + 24px)',
         left: 'calc(env(safe-area-inset-left) + 24px)',
         // Cap width but stay aligned to the right on wider viewports.

@@ -87,9 +87,22 @@
   html.dark .bg-ipe-navy-100 {
     background-color: rgb(0 30 52 / 0.4);
   }
+  /* Lightest navy/green tints (used as the "selected" surface in selector
+     cards) would render almost white in dark mode — re-tint to a soft gold
+     glow that reads as "active" on a dark surface. */
+  html.dark .bg-ipe-green-50,
+  html.dark .bg-ipe-navy-50 {
+    background-color: rgb(255 182 0 / 0.08);     /* yellow @ 0.08 */
+  }
   html.dark .bg-ipe-stone-100,
   html.dark .bg-ipe-stone-50 {
     background-color: rgb(0 30 52 / 0.25);
+  }
+  /* Selected-card border (border-ipe-green-600) is currently navy on navy —
+     promote to gold so it visibly outlines the chosen tile. */
+  html.dark .border-ipe-green-600,
+  html.dark .border-ipe-navy-600 {
+    border-color: theme('colors.ipe.gold.DEFAULT');
   }
 
   ::selection {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAccount } from 'wagmi';
 import { api } from '../api';
@@ -80,19 +81,22 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
     }
   }, [orderState?.status, onClose]);
 
-  return (
+  // Portal to body so the modal isn't trapped inside any ancestor that has a
+  // transform/filter (which would turn the fixed positioning into "fixed
+  // relative to the ancestor" — effectively absolute inside the product card).
+  return createPortal(
     <div
-      className="fixed inset-0 bg-ipe-ink/40 z-30 flex items-end sm:items-center sm:justify-center"
+      className="fixed inset-0 z-40 flex items-end sm:items-center sm:justify-center bg-ipe-navy-800/60 backdrop-blur-sm animate-fade-up"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-t-xl sm:rounded-xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto"
+        className="bg-white dark:bg-ipe-navy-700 rounded-t-xl sm:rounded-xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto shadow-xl border border-ipe-stone-200 dark:border-ipe-navy-500/40"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <header className="flex items-center justify-between px-5 py-3 border-b border-ipe-green/10">
-          <h2 className="font-semibold text-ipe-green">Pay with anything else</h2>
-          <button onClick={onClose} className="text-ipe-ink/60 hover:text-ipe-ink" aria-label="close">✕</button>
+        <header className="flex items-center justify-between px-5 py-3 border-b border-ipe-stone-200 dark:border-ipe-navy-500/40">
+          <h2 className="font-display font-semibold text-ipe-navy-700 dark:text-ipe-cream-100">Pay with anything else</h2>
+          <button onClick={onClose} className="text-ipe-ink-50 hover:text-ipe-ink leading-none text-lg" aria-label="close">×</button>
         </header>
 
         {!orderId ? (
@@ -163,7 +167,8 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
           />
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
