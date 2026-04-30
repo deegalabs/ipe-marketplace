@@ -108,10 +108,6 @@ function ProductCard({ product, index }: { product: ProductDTO; index: number })
           aria-hidden
           className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-350"
         />
-        {/* Category eyebrow, top-left — always visible. */}
-        <span className="absolute top-2.5 left-2.5 text-2xs font-semibold uppercase tracking-widest text-white/90 px-2 py-0.5 rounded-xs bg-ipe-ink/40 backdrop-blur">
-          {product.category}
-        </span>
       </div>
       <div className="p-4">
         <p className="font-medium tracking-tight text-ipe-ink leading-snug line-clamp-2">{product.name}</p>
