@@ -9,6 +9,7 @@ import { Admin } from './pages/Admin';
 import { InstallPrompt } from './components/InstallPrompt';
 import { Logo, FlowerMark } from './components/Logo';
 import { ThemeToggle } from './components/ThemeToggle';
+import { WalletMenu } from './components/WalletMenu';
 import { ShopIcon, OrdersIcon } from './components/icons';
 import { api } from './api';
 
@@ -90,14 +91,7 @@ function Header() {
         <div className="flex items-center gap-2">
           <ThemeToggle />
           {authenticated && wallet ? (
-            <button
-              onClick={() => logout()}
-              className="text-2xs sm:text-xs font-mono px-2.5 py-1.5 rounded-md bg-ipe-navy-100 text-ipe-navy-700 dark:bg-ipe-navy-700/40 dark:text-ipe-cream-100 hover:opacity-90 transition-opacity"
-              title="Click to disconnect"
-            >
-              <span className="sm:hidden">{wallet.slice(0, 4)}…{wallet.slice(-3)}</span>
-              <span className="hidden sm:inline">{wallet.slice(0, 6)}…{wallet.slice(-4)}</span>
-            </button>
+            <WalletMenu address={wallet} onDisconnect={() => logout()} />
           ) : (
             <button
               onClick={() => login()}
