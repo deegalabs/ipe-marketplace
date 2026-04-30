@@ -129,6 +129,11 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
           .update(schema.orders)
           .set({
             paymentRef: payment.paymentId,
+            cryptoPayAddress: payment.payAddress,
+            cryptoPayAmount: String(payment.payAmount),
+            cryptoPayCurrency: payment.payCurrency,
+            cryptoPayUri: payUri,
+            cryptoQrCodeBase64: qrCodeBase64,
             updatedAt: new Date(),
           })
           .where(eq(schema.orders.id, order.id))

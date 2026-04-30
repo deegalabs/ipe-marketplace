@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAccount } from 'wagmi';
 import { Link } from 'wouter';
@@ -5,6 +7,7 @@ import { api, type OrderDTO, type ProductDTO } from '../api';
 import { formatToken, formatBrl } from '../lib/format';
 import { ProductImage } from '../components/ProductImage';
 import { SkeletonBox, SkeletonText } from '../components/Skeleton';
+import { useToast } from '../lib/toast';
 
 export function Orders() {
   const { address } = useAccount();
@@ -89,10 +92,188 @@ function OrderRow({ order: o, product }: { order: OrderDTO; product: ProductDTO 
 
           <FulfillmentTimeline status={o.status} delivery={o.deliveryMethod} />
 
+          {o.status === 'awaiting_payment' && <ResumePaymentButton order={o} />}
+
           <TxLink order={o} />
         </div>
       </div>
     </li>
+  );
+}
+
+function ResumePaymentButton({ order: o }: { order: OrderDTO }) {
+  const [open, setOpen] = useState(false);
+  const hasResumeData =
+    !!o.pixQrCodeBase64 || !!o.cryptoQrCodeBase64 || !!o.externalCheckoutUrl;
+  if (!hasResumeData) return null;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="btn-primary text-xs mt-3 inline-flex"
+      >
+        Resume payment
+      </button>
+      {open && <ResumePaymentModal order={o} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+/// Renders the stored QR / address from the order row so the buyer can finish
+/// paying after closing the original checkout. Mirrors GatewayCheckout's
+/// confirmation surface but read-only — no order-creation calls here.
+function ResumePaymentModal({ order: o, onClose }: { order: OrderDTO; onClose: () => void }) {
+  const toast = useToast();
+  const [copied, setCopied] = useState<'address' | 'amount' | 'pix' | null>(null);
+
+  function copy(value: string, kind: 'address' | 'amount' | 'pix') {
+    void navigator.clipboard.writeText(value).then(() => {
+      setCopied(kind);
+      toast.success('Copied');
+      setTimeout(() => setCopied(null), 1500);
+    });
+  }
+
+  const isPix = o.paymentMethod === 'pix' && !!o.pixQrCodeBase64;
+  const isCrypto = o.paymentMethod === 'crypto-gateway' && !!o.cryptoQrCodeBase64;
+  const isHosted = o.paymentMethod === 'crypto-gateway' && !o.cryptoQrCodeBase64 && !!o.externalCheckoutUrl;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-40 flex items-end sm:items-center sm:justify-center bg-ipe-navy-800/60 backdrop-blur-sm animate-fade-up"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-ipe-cream-50 dark:bg-ipe-navy-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto shadow-xl border border-ipe-stone-200 dark:border-ipe-navy-500/40"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <header className="flex items-center justify-between px-5 py-3 border-b border-ipe-stone-200 dark:border-ipe-navy-500/40">
+          <h2 className="font-display font-semibold text-ipe-navy-700 dark:text-ipe-cream-100">
+            Resume payment
+          </h2>
+          <button onClick={onClose} className="text-ipe-ink-50 hover:text-ipe-ink leading-none text-lg" aria-label="close">×</button>
+        </header>
+
+        <div className="p-5 space-y-4">
+          {isPix && (
+            <>
+              <p className="text-sm text-ipe-ink/70">
+                Open your bank app → Scan QR → Confirm. We auto-detect when the payment lands.
+              </p>
+              <img
+                src={`data:image/png;base64,${o.pixQrCodeBase64}`}
+                alt="PIX QR code"
+                className="mx-auto w-56 h-56 rounded border border-ipe-green/10"
+              />
+              {o.pixQrCode && (
+                <div>
+                  <label className="label">Or copy &amp; paste</label>
+                  <div className="flex gap-2">
+                    <input
+                      readOnly
+                      className="input font-mono text-xs flex-1"
+                      value={o.pixQrCode}
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                    />
+                    <button
+                      type="button"
+                      className="btn-ghost text-xs whitespace-nowrap"
+                      onClick={() => copy(o.pixQrCode!, 'pix')}
+                    >
+                      {copied === 'pix' ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {isCrypto && (
+            <>
+              <p className="text-sm text-ipe-ink/70">
+                Send <strong>{o.cryptoPayAmount} {(o.cryptoPayCurrency ?? '').toUpperCase()}</strong> to the address below.
+              </p>
+              <img
+                src={o.cryptoQrCodeBase64!}
+                alt={`${o.cryptoPayCurrency ?? 'crypto'} payment QR`}
+                className="mx-auto w-56 h-56 rounded border border-ipe-green/10 bg-white"
+              />
+              {o.cryptoPayUri && (
+                <a
+                  href={o.cryptoPayUri}
+                  className="btn-ghost w-full text-xs sm:hidden"
+                  rel="noreferrer"
+                >
+                  Open in wallet
+                </a>
+              )}
+              {o.cryptoPayAmount && (
+                <div>
+                  <label className="label">Amount</label>
+                  <div className="flex gap-2">
+                    <input
+                      readOnly
+                      className="input font-mono text-xs flex-1"
+                      value={`${o.cryptoPayAmount} ${(o.cryptoPayCurrency ?? '').toUpperCase()}`}
+                    />
+                    <button
+                      type="button"
+                      className="btn-ghost text-xs whitespace-nowrap"
+                      onClick={() => copy(o.cryptoPayAmount!, 'amount')}
+                    >
+                      {copied === 'amount' ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {o.cryptoPayAddress && (
+                <div>
+                  <label className="label">Address</label>
+                  <div className="flex gap-2">
+                    <input
+                      readOnly
+                      className="input font-mono text-xs flex-1"
+                      value={o.cryptoPayAddress}
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                    />
+                    <button
+                      type="button"
+                      className="btn-ghost text-xs whitespace-nowrap"
+                      onClick={() => copy(o.cryptoPayAddress!, 'address')}
+                    >
+                      {copied === 'address' ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {isHosted && (
+            <>
+              <p className="text-sm text-ipe-ink/70">
+                Reopen the hosted crypto checkout to complete this payment.
+              </p>
+              <a
+                href={o.externalCheckoutUrl!}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-primary w-full"
+              >
+                Open checkout
+              </a>
+            </>
+          )}
+
+          <p className="text-2xs text-ipe-ink/50">
+            Crypto quote may have expired (~20 min validity). If your wallet rejects the amount, contact support — we can regenerate it.
+          </p>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

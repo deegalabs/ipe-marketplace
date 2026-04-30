@@ -81,6 +81,11 @@ export interface OrderDTO {
   externalCheckoutUrl: string | null;
   pixQrCode: string | null;
   pixQrCodeBase64: string | null;
+  cryptoPayAddress: string | null;
+  cryptoPayAmount: string | null;
+  cryptoPayCurrency: string | null;
+  cryptoPayUri: string | null;
+  cryptoQrCodeBase64: string | null;
   blockNumber: string | null;
   status: 'pending' | 'awaiting_payment' | 'paid' | 'shipped' | 'delivered' | 'refunded' | 'cancelled';
   deliveryMethod: DeliveryMethod;

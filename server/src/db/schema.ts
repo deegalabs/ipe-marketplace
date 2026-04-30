@@ -70,6 +70,14 @@ export const orders = pgTable('orders', {
   /// the buyer reloads the page mid-payment.
   pixQrCode: text('pix_qr_code'),
   pixQrCodeBase64: text('pix_qr_code_base64'),
+  /// NOWPayments direct-checkout payload — same purpose as the PIX columns
+  /// above. Stored so the buyer can resume payment from My Orders if they
+  /// closed the modal before sending the funds.
+  cryptoPayAddress: text('crypto_pay_address'),
+  cryptoPayAmount: text('crypto_pay_amount'),         // human-readable (e.g. "0.0024")
+  cryptoPayCurrency: text('crypto_pay_currency'),     // ticker (e.g. "btc", "usdcerc20")
+  cryptoPayUri: text('crypto_pay_uri'),               // BIP-21 / EIP-681 / Solana Pay URI
+  cryptoQrCodeBase64: text('crypto_qr_code_base64'),
   blockNumber: bigint('block_number', { mode: 'bigint' }),
   status: orderStatus('status').notNull().default('pending'),
   deliveryMethod: deliveryMethod('delivery_method').notNull().default('shipping'),
