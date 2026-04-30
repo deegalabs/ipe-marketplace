@@ -9,6 +9,7 @@ import { env } from '../config';
 import { formatToken, formatBrl } from '../lib/format';
 import { normalizeImageUrl } from '../lib/imageUrl';
 import { useToast } from '../lib/toast';
+import { SkeletonBox, SkeletonText } from '../components/Skeleton';
 
 export function Admin() {
   const { user, logout } = usePrivy();
@@ -35,15 +36,32 @@ export function Admin() {
         <button onClick={logout} className="btn-ghost text-xs">Sign out</button>
       </header>
 
-      <TreasuryCard data={treasuryQ.data} />
-      <ProductsCard products={productsQ.data ?? []} />
-      <OrdersCard orders={ordersQ.data ?? []} products={productsQ.data ?? []} />
+      <TreasuryCard data={treasuryQ.data} loading={treasuryQ.isLoading} />
+      <ProductsCard products={productsQ.data ?? []} loading={productsQ.isLoading} />
+      <OrdersCard orders={ordersQ.data ?? []} products={productsQ.data ?? []} loading={ordersQ.isLoading} />
       <AdminsCard currentAdminId={meQ.data?.adminId} />
     </section>
   );
 }
 
-function TreasuryCard({ data }: { data: Awaited<ReturnType<typeof api.treasury>> | undefined }) {
+function TreasuryCard({ data, loading }: { data: Awaited<ReturnType<typeof api.treasury>> | undefined; loading: boolean }) {
+  if (loading && !data) {
+    return (
+      <div className="card p-5 space-y-3">
+        <SkeletonBox className="h-7 w-32" />
+        <SkeletonText className="w-2/3" />
+        <div className="space-y-2 pt-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="flex gap-4 items-center">
+              <SkeletonText className="w-16" />
+              <SkeletonText className="flex-1" />
+              <SkeletonText className="w-24" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
   if (!data) return null;
   const fmt = (b: { symbol: string; decimals: number; balance: string }) =>
     `${(Number(b.balance) / 10 ** b.decimals).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${b.symbol}`;
@@ -119,7 +137,7 @@ function draftFromProduct(p: ProductDTO): ProductDraft {
   };
 }
 
-function ProductsCard({ products }: { products: ProductDTO[] }) {
+function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: boolean }) {
   const qc = useQueryClient();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
@@ -200,6 +218,8 @@ function ProductsCard({ products }: { products: ProductDTO[] }) {
           <button className="btn-ghost text-xs" onClick={() => setEditing('new')}>+ New product</button>
         )}
       </div>
+
+      {loading && products.length === 0 && <TableRowsSkeleton rows={3} cols={5} />}
 
       {editing !== null && (
         <ProductForm
@@ -407,7 +427,7 @@ function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormP
   );
 }
 
-function OrdersCard({ orders, products }: { orders: OrderDTO[]; products: ProductDTO[] }) {
+function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; products: ProductDTO[]; loading: boolean }) {
   const qc = useQueryClient();
   const toast = useToast();
   const productById = new Map(products.map((p) => [p.id, p] as const));
@@ -425,7 +445,9 @@ function OrdersCard({ orders, products }: { orders: OrderDTO[]; products: Produc
   return (
     <div className="card p-5">
       <h2 className="text-xl font-semibold text-ipe-green mb-3">Orders</h2>
-      {orders.length === 0 ? (
+      {loading && orders.length === 0 ? (
+        <TableRowsSkeleton rows={3} cols={6} />
+      ) : orders.length === 0 ? (
         <p className="text-ipe-ink/60 text-sm">No orders yet.</p>
       ) : (
         <>
@@ -676,6 +698,20 @@ function AdminsCard({ currentAdminId }: { currentAdminId: string | undefined }) 
       </div>
       {error && <p className="text-sm text-red-700 mb-3">{error}</p>}
 
+      {adminsQ.isLoading && !adminsQ.data && (
+        <div className="space-y-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="py-2 flex items-center justify-between gap-3">
+              <div className="flex-1 space-y-1.5">
+                <SkeletonText className="w-1/2" />
+                <SkeletonText className="w-1/3" />
+              </div>
+              <SkeletonBox className="h-7 w-20 shrink-0" />
+            </div>
+          ))}
+        </div>
+      )}
+
       <ul className="divide-y divide-ipe-green/10">
         {(adminsQ.data ?? []).map((a) => {
           const isSelf = a.id === currentAdminId;
@@ -714,4 +750,20 @@ function formatPaid(o: OrderDTO): string {
     case 'pix': return formatBrl(o.totalPaid);
     case 'crypto-gateway': return `$${(Number(o.totalPaid) / 1e6).toFixed(2)} (crypto)`;
   }
+}
+
+/// Generic table-row skeleton — fills both the mobile stack and desktop table
+/// in admin cards with placeholder bars while data is loading.
+function TableRowsSkeleton({ rows, cols }: { rows: number; cols: number }) {
+  return (
+    <div className="space-y-2 mt-4">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="grid gap-3 items-center" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+          {Array.from({ length: cols }).map((__, j) => (
+            <SkeletonText key={j} className={j === 0 ? 'w-3/4' : 'w-2/3'} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
 }
