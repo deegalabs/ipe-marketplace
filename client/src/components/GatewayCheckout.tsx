@@ -101,7 +101,7 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-ipe-navy-700 rounded-t-xl sm:rounded-xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto shadow-xl border border-ipe-stone-200 dark:border-ipe-navy-500/40"
+        className="bg-ipe-cream-50 dark:bg-ipe-navy-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto shadow-xl border border-ipe-stone-200 dark:border-ipe-navy-500/40"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <header className="flex items-center justify-between px-5 py-3 border-b border-ipe-stone-200 dark:border-ipe-navy-500/40">
