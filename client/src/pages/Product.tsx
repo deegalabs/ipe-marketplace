@@ -145,13 +145,24 @@ export function ProductPage() {
   })();
 
   return (
-    <article className="grid md:grid-cols-2 gap-6 sm:gap-8">
-      <img src={p.imageUrl} alt={p.name} className="card aspect-square object-cover w-full" />
-      <div className="space-y-5">
+    <article className="grid md:grid-cols-2 gap-6 sm:gap-10">
+      <div className="card overflow-hidden aspect-square motion-in">
+        <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+      </div>
+      <div className="space-y-6 motion-in" style={{ animationDelay: '80ms' }}>
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-ipe-green">{p.name}</h1>
-          <p className="text-xl mt-2">{priceDisplay(p, currency, rates)}</p>
-          <p className="text-ipe-ink/70 mt-4 text-sm sm:text-base">{p.description}</p>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-ipe-gold-600 mb-2">
+            {p.category}
+          </p>
+          <h1 className="text-3xl sm:text-4xl font-display font-bold text-ipe-green-700 tracking-tight leading-tight">
+            {p.name}
+          </h1>
+          <p className="text-2xl mt-3 font-mono tabular-nums text-ipe-ink">
+            {priceDisplay(p, currency, rates)}
+          </p>
+          <p className="text-ipe-ink-70 mt-5 text-sm sm:text-base leading-relaxed max-w-prose">
+            {p.description}
+          </p>
         </div>
 
         {step === 'done' ? (
@@ -224,25 +235,29 @@ function PaymentSelector({ value, onChange, enabled, priceIpe, priceUsdc, priceB
   ];
   return (
     <fieldset className="space-y-2">
-      <legend className="label">Payment method</legend>
+      <legend className="label">Payment</legend>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         {opts.map((o) => {
           const disabled = !enabled.includes(o.id);
+          const selected = value === o.id;
           return (
             <button
               key={o.id}
               type="button"
               disabled={disabled}
               onClick={() => onChange(o.id)}
-              className={`p-3 rounded-md border text-left ${
-                value === o.id
-                  ? 'border-ipe-green bg-ipe-green/5'
-                  : 'border-ipe-green/20 hover:border-ipe-green/40'
+              className={`relative p-3.5 rounded-md border text-left transition-all duration-250 ease-smooth ${
+                selected
+                  ? 'border-ipe-green-600 bg-ipe-green-50 shadow-sm'
+                  : 'border-ipe-stone-200 hover:border-ipe-green-600/50 hover:bg-ipe-stone-50'
               } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
             >
-              <div className="font-medium">{o.label}</div>
-              <div className="text-xs text-ipe-ink/70">{o.price}</div>
-              <div className="text-[10px] text-ipe-ink/50 mt-0.5">{o.sub}</div>
+              {selected && (
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-ipe-gold-DEFAULT" />
+              )}
+              <div className="font-semibold text-ipe-ink">{o.label}</div>
+              <div className="text-sm font-mono tabular-nums text-ipe-ink-70 mt-0.5">{o.price}</div>
+              <div className="text-2xs uppercase tracking-wider text-ipe-ink-50 mt-1">{o.sub}</div>
             </button>
           );
         })}
@@ -268,21 +283,25 @@ function DeliverySelector({
       <div className="grid grid-cols-2 gap-2">
         {opts.map((o) => {
           const disabled = !enabled.includes(o.id) || o.soon;
+          const selected = value === o.id;
           return (
             <button
               key={o.id}
               type="button"
               disabled={disabled}
               onClick={() => onChange(o.id)}
-              className={`p-3 rounded-md border text-left ${
-                value === o.id
-                  ? 'border-ipe-green bg-ipe-green/5'
-                  : 'border-ipe-green/20 hover:border-ipe-green/40'
+              className={`relative p-3.5 rounded-md border text-left transition-all duration-250 ease-smooth ${
+                selected
+                  ? 'border-ipe-green-600 bg-ipe-green-50 shadow-sm'
+                  : 'border-ipe-stone-200 hover:border-ipe-green-600/50 hover:bg-ipe-stone-50'
               } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
             >
-              <div className="font-medium">{o.label}</div>
-              <div className="text-xs text-ipe-ink/70">{o.desc}</div>
-              {o.soon && <div className="text-[10px] text-amber-700 mt-1">soon</div>}
+              {selected && (
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-ipe-gold-DEFAULT" />
+              )}
+              <div className="font-semibold text-ipe-ink">{o.label}</div>
+              <div className="text-2xs uppercase tracking-wider text-ipe-ink-50 mt-1">{o.desc}</div>
+              {o.soon && <div className="badge-warn mt-2">soon</div>}
             </button>
           );
         })}

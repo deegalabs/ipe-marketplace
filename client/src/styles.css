@@ -3,54 +3,156 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    color-scheme: light;
+  }
+
   html, body {
-    /* Lock the visible viewport on iOS so the address bar collapse doesn't shift content. */
     overscroll-behavior-y: contain;
   }
+
   body {
-    font-family: theme('fontFamily.display');
-    /* Respect the iOS safe area (notch / home indicator) when running standalone. */
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss03', 'ss01';   /* refined Inter glyphs */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    background:
+      radial-gradient(1200px 600px at 100% -10%, rgba(243, 201, 105, 0.18), transparent 60%),
+      radial-gradient(900px 500px at -10% 100%, rgba(10, 58, 47, 0.06), transparent 60%),
+      theme('colors.ipe.cream.DEFAULT');
+    color: theme('colors.ipe.ink.DEFAULT');
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
-  /* Disable iOS tap highlight while keeping accessible focus rings via :focus-visible. */
+
+  ::selection {
+    background: theme('colors.ipe.gold.DEFAULT');
+    color: theme('colors.ipe.green.DEFAULT');
+  }
+
   button, a {
     -webkit-tap-highlight-color: transparent;
   }
+
   input, select, textarea {
-    font-size: 16px; /* prevents iOS from auto-zooming the page on focus */
+    font-size: 16px;     /* prevent iOS auto-zoom on focus */
+  }
+
+  /* Accessible focus ring on every interactive element */
+  *:focus-visible {
+    outline: 2px solid theme('colors.ipe.gold.DEFAULT');
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: theme('fontFamily.display');
+    letter-spacing: -0.015em;
   }
 }
 
 @layer components {
+  /* ── Buttons ──────────────────────────────────────────────── */
   .btn {
-    @apply inline-flex items-center justify-center px-4 py-2.5 rounded-md font-medium transition-colors;
-    /* WCAG / Apple HIG: 44px minimum tap target. */
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md font-medium
+           transition-all duration-250 ease-smooth
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none;
     min-height: 44px;
   }
+
   .btn-primary {
-    @apply btn bg-ipe-green text-ipe-cream hover:bg-ipe-green/90 active:bg-ipe-green/80 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply btn bg-ipe-green-600 text-ipe-cream-50
+           hover:bg-ipe-green-700 hover:-translate-y-px hover:shadow-md
+           active:translate-y-0 active:shadow-sm;
   }
+
   .btn-ghost {
-    @apply btn bg-transparent text-ipe-green border border-ipe-green hover:bg-ipe-green/5 active:bg-ipe-green/10;
+    @apply btn bg-transparent text-ipe-green-600 border border-ipe-green-600/25
+           hover:bg-ipe-green-600/5 hover:border-ipe-green-600/50
+           active:bg-ipe-green-600/10;
   }
+
+  .btn-soft {
+    @apply btn bg-ipe-green-600/8 text-ipe-green-700 border border-transparent
+           hover:bg-ipe-green-600/12;
+  }
+
+  .btn-gold {
+    @apply btn bg-ipe-gold-DEFAULT text-ipe-green-700
+           hover:bg-ipe-gold-300 hover:-translate-y-px hover:shadow-md;
+  }
+
+  /* ── Surfaces ─────────────────────────────────────────────── */
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-ipe-green/10 overflow-hidden;
+    @apply bg-white/95 backdrop-blur-sm rounded-lg border border-ipe-stone-200/60
+           shadow-sm transition-all duration-250 ease-smooth;
   }
+
+  .card-interactive {
+    @apply card hover:shadow-md hover:-translate-y-0.5 hover:border-ipe-stone-300;
+  }
+
+  /* ── Form fields ──────────────────────────────────────────── */
   .input {
-    @apply w-full px-3 py-2.5 rounded-md border border-ipe-green/20 bg-white focus:outline-none focus:ring-2 focus:ring-ipe-green/40;
+    @apply w-full px-3 py-2.5 rounded-md bg-white/95 border border-ipe-stone-200
+           text-ipe-ink placeholder:text-ipe-ink-30
+           transition-all duration-250 ease-smooth
+           focus:outline-none focus:border-ipe-green-600 focus:ring-2 focus:ring-ipe-green-600/15
+           disabled:opacity-50 disabled:cursor-not-allowed;
     min-height: 44px;
   }
+
   .label {
-    @apply block text-sm font-medium text-ipe-ink mb-1;
+    @apply block text-xs font-medium uppercase tracking-wider text-ipe-ink-70 mb-1.5;
   }
-  /* Horizontal scroll wrapper for tables that don't fit on phones. */
+
+  /* ── Badges ───────────────────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center gap-1 text-2xs font-medium px-2 py-0.5 rounded-xs;
+  }
+  .badge-neutral { @apply badge bg-ipe-stone-100 text-ipe-ink-70; }
+  .badge-green   { @apply badge bg-ipe-green-100 text-ipe-green-700; }
+  .badge-gold    { @apply badge bg-ipe-gold-50 text-ipe-gold-600; }
+  .badge-warn    { @apply badge bg-amber-100 text-amber-800; }
+  .badge-danger  { @apply badge bg-red-100 text-red-700; }
+  .badge-info    { @apply badge bg-blue-100 text-blue-700; }
+
+  /* Status chips for orders */
+  .status-pending          { @apply badge-neutral; }
+  .status-awaiting_payment { @apply badge-info; }
+  .status-paid             { @apply badge bg-ipe-green-100 text-ipe-green-700; }
+  .status-shipped          { @apply badge-warn; }
+  .status-delivered        { @apply badge-green; }
+  .status-refunded         { @apply badge-danger; }
+  .status-cancelled        { @apply badge-danger; }
+
+  /* ── Layout helpers ───────────────────────────────────────── */
   .table-wrap {
     @apply -mx-5 overflow-x-auto px-5;
   }
-  /* Sticky bottom action bar respecting iOS home indicator. */
+
   .sticky-bottom {
-    @apply sticky -mx-4 bottom-0 px-4 py-3 bg-white/95 backdrop-blur border-t border-ipe-green/10;
+    @apply sticky -mx-4 bottom-0 px-4 py-3 bg-white/95 backdrop-blur border-t border-ipe-stone-200;
     padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
+
+  /* Dotted divider in a sea of cream */
+  .divider {
+    @apply border-t border-dashed border-ipe-stone-200 my-6;
+  }
+}
+
+@layer utilities {
+  /* Subtle motion entrance for content blocks */
+  .motion-in {
+    animation: fade-up 350ms cubic-bezier(0.32, 0.72, 0.24, 1) both;
+  }
+
+  /* Apple-style frosted glass on header / modal — readable on warm bg */
+  .glass {
+    background: rgba(248, 245, 236, 0.78);
+    backdrop-filter: saturate(180%) blur(14px);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
   }
 }

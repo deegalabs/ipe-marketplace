@@ -41,12 +41,16 @@ export function CurrencyToggle() {
     { value: 'brl', label: 'BRL' },
   ];
   return (
-    <div className="inline-flex rounded-md overflow-hidden border border-ipe-green/20 text-xs w-full sm:w-auto">
+    <div className="inline-flex rounded-md overflow-hidden border border-ipe-stone-200 text-xs w-full sm:w-auto bg-white/60 backdrop-blur-sm p-0.5 gap-0.5">
       {opts.map((o) => (
         <button
           key={o.value}
           onClick={() => setCurrency(o.value)}
-          className={`flex-1 sm:flex-initial px-2 py-1.5 ${currency === o.value ? 'bg-ipe-green text-ipe-cream' : 'bg-white text-ipe-ink hover:bg-ipe-green/5'}`}
+          className={`flex-1 sm:flex-initial px-2.5 py-1 rounded-xs font-medium transition-all duration-250 ease-smooth ${
+            currency === o.value
+              ? 'bg-ipe-green-600 text-ipe-cream-50 shadow-sm'
+              : 'text-ipe-ink-70 hover:text-ipe-green-700 hover:bg-ipe-stone-100'
+          }`}
         >
           {o.label}
         </button>
