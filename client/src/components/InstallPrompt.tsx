@@ -7,6 +7,7 @@ interface BeforeInstallPromptEvent extends Event {
 
 const DISMISSED_KEY = 'install_prompt_dismissed_at';
 const DISMISS_TTL_MS = 1000 * 60 * 60 * 24 * 7; // re-prompt after 7 days
+const AUTO_HIDE_MS = 30_000;                    // soft auto-dismiss after 30s
 
 /// Captures Chrome/Edge's beforeinstallprompt and surfaces a small bottom-anchored
 /// affordance for users to install the PWA. Dismissals are remembered for a week.
@@ -49,6 +50,15 @@ export function InstallPrompt() {
 
     return () => window.removeEventListener('beforeinstallprompt', onBeforeInstall);
   }, []);
+
+  // Auto-hide 30s after the prompt becomes visible. Silent — doesn't mark
+  // dismissed in localStorage, so it can show again on a future visit. Keeps
+  // the install affordance available without making it feel mandatory.
+  useEffect(() => {
+    if (hidden) return;
+    const t = setTimeout(() => setHidden(true), AUTO_HIDE_MS);
+    return () => clearTimeout(t);
+  }, [hidden]);
 
   function dismiss() {
     localStorage.setItem(DISMISSED_KEY, String(Date.now()));
