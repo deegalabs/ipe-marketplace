@@ -412,12 +412,6 @@ function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormP
           Allow event pickup
         </label>
 
-        {mode === 'edit' && (
-          <p className="sm:col-span-2 text-xs text-amber-700">
-            Price changes are off-chain. If this product is already onchain, click <strong>Sync USDC</strong> on
-            the row after saving to push the new price to the contract (owner-only tx).
-          </p>
-        )}
         {error && <p className="sm:col-span-2 text-sm text-red-700">{error}</p>}
         <button className="btn-primary sm:col-span-2" onClick={save} disabled={saving}>
           {saving ? 'Saving…' : mode === 'new' ? 'Create product' : 'Save changes'}
