@@ -1,11 +1,17 @@
 import { Router, raw } from 'express';
 import { eq, and, inArray } from 'drizzle-orm';
+import QRCode from 'qrcode';
 import { createGatewayOrderInputSchema } from '@ipe/shared';
 import { db, schema } from '../db/client.js';
 import { encryptAddress } from '../crypto.js';
 import { features } from '../env.js';
 import { createPixCharge, getPayment, verifyWebhookSignature } from '../services/mercadopago.js';
-import { createInvoice, verifyIpnSignature } from '../services/nowpayments.js';
+import {
+  createInvoice,
+  createDirectPayment,
+  getMerchantCoins,
+  verifyIpnSignature,
+} from '../services/nowpayments.js';
 import { mintReceiptForGatewayOrder } from '../services/onchain.js';
 import { usdcToBrlCents } from './rates.js';
 import {
@@ -100,9 +106,46 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
         pix: { qrCode: charge.qrCode, qrCodeBase64: charge.qrCodeBase64, expiresAt: charge.expiresAt },
       });
     } else {
+      const priceUsd = Number(totalPaid) / 1e6; // USDC has 6 decimals → USD value
+      const description = `Ipê Store · ${product.name} ×${parsed.data.quantity}`;
+
+      // Direct payment (rendered in-app) when buyer picked a coin; falls back
+      // to the hosted invoice page if no `payCurrency` was provided.
+      if (parsed.data.payCurrency) {
+        const payment = await createDirectPayment({
+          priceUsd,
+          payCurrency: parsed.data.payCurrency,
+          description,
+          externalReference: order.id,
+        });
+        // Encode just the address — broadest wallet compatibility across coins.
+        const qrCodeBase64 = await QRCode.toDataURL(payment.payAddress, { width: 256, margin: 1 });
+        const [updated] = await db
+          .update(schema.orders)
+          .set({
+            paymentRef: payment.paymentId,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.orders.id, order.id))
+          .returning();
+        void sendOrderCreated(updated!, product);
+        void sendAdminNewOrder(updated!, product);
+        return res.status(201).json({
+          orderId: order.id,
+          provider: 'nowpayments',
+          crypto: {
+            payAddress: payment.payAddress,
+            payAmount: payment.payAmount,
+            payCurrency: payment.payCurrency,
+            qrCodeBase64,
+            expiresAt: payment.expiresAt,
+          },
+        });
+      }
+
       const invoice = await createInvoice({
-        priceUsd: Number(totalPaid) / 1e6, // USDC has 6 decimals → USD value
-        description: `Ipê Store · ${product.name} ×${parsed.data.quantity}`,
+        priceUsd,
+        description,
         externalReference: order.id,
       });
       const [updated] = await db
@@ -131,6 +174,24 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
       .set({ status: 'cancelled', updatedAt: new Date() })
       .where(eq(schema.orders.id, order.id));
     return res.status(502).json({ error: 'failed to create gateway charge' });
+  }
+});
+
+// ─── Crypto currencies (NOWPayments merchant-enabled list) ──────────
+//
+// Used by the in-app crypto checkout to render a coin picker. The hosted
+// page does the same selection — we just bring it in-app.
+
+gatewayRouter.get('/payment/crypto-currencies', async (_req, res) => {
+  if (!features.nowpayments) {
+    return res.status(503).json({ error: 'crypto-gateway is not configured on this server' });
+  }
+  try {
+    const coins = await getMerchantCoins();
+    return res.json({ coins });
+  } catch (err) {
+    console.error('[gateway] getMerchantCoins failed', err);
+    return res.status(502).json({ error: 'failed to fetch crypto currencies' });
   }
 });
 

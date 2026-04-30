@@ -52,6 +52,131 @@ export async function createInvoice(args: CreateInvoiceArgs): Promise<Invoice> {
   return { invoiceId: json.id, hostedUrl: json.invoice_url };
 }
 
+// ─── Merchant coins (in-app crypto checkout) ────────────────────────
+//
+// Returns the list of coins the merchant has enabled in their NOWPayments
+// dashboard — same set the buyer would see on the hosted page. We cache for
+// 5 minutes since this rarely changes.
+
+export interface MerchantCoin {
+  /// NOWPayments ticker, e.g. 'btc', 'eth', 'usdcerc20', 'usdcmatic'.
+  ticker: string;
+  /// Friendly display name for the UI.
+  label: string;
+}
+
+/// Tiny mapping for the most common tickers — anything missing falls back to
+/// the upper-cased ticker. We don't need NOWPayments' full-currencies endpoint
+/// (paid plan) for the basics.
+const TICKER_LABELS: Record<string, string> = {
+  btc: 'Bitcoin',
+  eth: 'Ethereum',
+  ltc: 'Litecoin',
+  zec: 'Zcash',
+  bch: 'Bitcoin Cash',
+  doge: 'Dogecoin',
+  xmr: 'Monero',
+  trx: 'Tron',
+  sol: 'Solana',
+  matic: 'Polygon',
+  bnb: 'BNB',
+  ada: 'Cardano',
+  dot: 'Polkadot',
+  usdterc20: 'USDT (Ethereum)',
+  usdttrc20: 'USDT (Tron)',
+  usdtbsc: 'USDT (BSC)',
+  usdtmatic: 'USDT (Polygon)',
+  usdtsol: 'USDT (Solana)',
+  usdcerc20: 'USDC (Ethereum)',
+  usdcmatic: 'USDC (Polygon)',
+  usdcsol: 'USDC (Solana)',
+  usdcbase: 'USDC (Base)',
+  usdcbsc: 'USDC (BSC)',
+};
+
+let coinsCache: { coins: MerchantCoin[]; fetchedAt: number } | null = null;
+const COINS_TTL_MS = 5 * 60_000;
+
+export async function getMerchantCoins(): Promise<MerchantCoin[]> {
+  if (!features.nowpayments) throw new NowPaymentsUnavailable();
+  if (coinsCache && Date.now() - coinsCache.fetchedAt < COINS_TTL_MS) {
+    return coinsCache.coins;
+  }
+
+  const res = await fetch(`${NP_BASE}/merchant/coins`, {
+    headers: { 'x-api-key': env.NOWPAYMENTS_API_KEY },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`NOWPayments getMerchantCoins failed: ${res.status} ${text}`);
+  }
+  const json = (await res.json()) as { selectedCurrencies?: string[] };
+  const tickers = json.selectedCurrencies ?? [];
+  const coins: MerchantCoin[] = tickers.map((t) => ({
+    ticker: t,
+    label: TICKER_LABELS[t.toLowerCase()] ?? t.toUpperCase(),
+  }));
+  coinsCache = { coins, fetchedAt: Date.now() };
+  return coins;
+}
+
+// ─── Direct payment (renders inside our modal, no redirect) ──────────
+
+interface CreateDirectPaymentArgs {
+  priceUsd: number;
+  payCurrency: string;
+  description: string;
+  externalReference: string;
+}
+
+export interface DirectPayment {
+  paymentId: string;
+  payAddress: string;
+  /// Amount in the buyer's chosen `payCurrency`. NOWPayments locks this for
+  /// `valid_until`; if the buyer underpays we'll see status='partially_paid'.
+  payAmount: number;
+  payCurrency: string;
+  expiresAt: string | null;
+}
+
+export async function createDirectPayment(args: CreateDirectPaymentArgs): Promise<DirectPayment> {
+  if (!features.nowpayments) throw new NowPaymentsUnavailable();
+
+  const res = await fetch(`${NP_BASE}/payment`, {
+    method: 'POST',
+    headers: {
+      'x-api-key': env.NOWPAYMENTS_API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      price_amount: args.priceUsd,
+      price_currency: 'usd',
+      pay_currency: args.payCurrency,
+      order_id: args.externalReference,
+      order_description: args.description,
+      ipn_callback_url: `${env.PUBLIC_API_URL}/webhooks/nowpayments`,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`NOWPayments createPayment failed: ${res.status} ${text}`);
+  }
+  const json = (await res.json()) as {
+    payment_id: string | number;
+    pay_address: string;
+    pay_amount: number;
+    pay_currency: string;
+    valid_until?: string;
+  };
+  return {
+    paymentId: String(json.payment_id),
+    payAddress: json.pay_address,
+    payAmount: json.pay_amount,
+    payCurrency: json.pay_currency,
+    expiresAt: json.valid_until ?? null,
+  };
+}
+
 /// IPN webhook signature: HMAC-SHA512 of the *sorted* JSON body using IPN secret.
 /// Sent in the `x-nowpayments-sig` header. We re-serialize sorted to verify.
 export function verifyIpnSignature(rawBody: string, signature: string | undefined): boolean {

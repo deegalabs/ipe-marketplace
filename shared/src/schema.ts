@@ -159,6 +159,10 @@ export const createGatewayOrderInputSchema = z
     quantity: z.number().int().positive(),
     /// 'pix' → Mercado Pago. 'crypto-gateway' → NOWPayments.
     paymentMethod: z.enum(['pix', 'crypto-gateway']),
+    /// NOWPayments ticker (e.g. 'btc', 'eth', 'usdcerc20'). When provided with
+    /// crypto-gateway, we generate a direct payment address shown in-app rather
+    /// than redirecting to the NOWPayments hosted page.
+    payCurrency: z.string().min(1).max(20).optional(),
     deliveryMethod: deliveryMethodEnum,
     shippingAddress: shippingAddressSchema.optional(),
     pickup: pickupInfoSchema.optional(),

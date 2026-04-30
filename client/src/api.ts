@@ -130,6 +130,9 @@ export const api = {
     buyerAddress?: string;
     quantity: number;
     paymentMethod: 'pix' | 'crypto-gateway';
+    /// NOWPayments ticker (e.g. 'btc', 'eth', 'usdcerc20'). Required for the
+    /// in-app crypto flow; omit to fall back to the hosted checkout page.
+    payCurrency?: string;
     deliveryMethod: 'shipping' | 'pickup';
     shippingAddress?: unknown;
     pickup?: { eventId: string; displayName: string };
@@ -138,8 +141,18 @@ export const api = {
       orderId: string;
       provider: 'mercadopago' | 'nowpayments';
       pix?: { qrCode: string; qrCodeBase64: string; expiresAt: string | null };
+      crypto?: {
+        payAddress: string;
+        payAmount: number;
+        payCurrency: string;
+        qrCodeBase64: string;
+        expiresAt: string | null;
+      };
       checkoutUrl?: string;
     }>('/orders/gateway', { method: 'POST', body: JSON.stringify(input) }),
+  /// Crypto coins enabled on the NOWPayments merchant account.
+  cryptoCurrencies: () =>
+    request<{ coins: { ticker: string; label: string }[] }>('/payment/crypto-currencies'),
   /// Local-dev only — manually mark a gateway order as paid (simulates webhook).
   devConfirmGatewayOrder: (id: string) =>
     request<{ ok: true }>(`/orders/gateway/${id}/dev-confirm`, { method: 'POST' }),
