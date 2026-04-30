@@ -28,6 +28,14 @@ export function Orders() {
     );
   }
   if (ordersQ.isLoading) return <OrdersSkeleton />;
+  if (ordersQ.error) {
+    return (
+      <EmptyState
+        title="Couldn't load orders"
+        body={ordersQ.error instanceof Error ? ordersQ.error.message : 'Something went wrong fetching your orders. Try again in a moment.'}
+      />
+    );
+  }
   if (!ordersQ.data?.length) {
     return (
       <EmptyState
