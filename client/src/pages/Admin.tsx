@@ -158,9 +158,34 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const toast = useToast();
+  const confirm = useConfirm();
   const [busyId, setBusyId] = useState<string | null>(null);
   /// null = closed, 'new' = creating, '<uuid>' = editing that product
   const [editing, setEditing] = useState<string | 'new' | null>(null);
+
+  /// Soft-delete via `active=false` so the product disappears from the public
+  /// shop without breaking historical orders' foreign keys. Reversible.
+  async function setActive(p: ProductDTO, active: boolean) {
+    if (active === false) {
+      const ok = await confirm({
+        title: 'Deactivate product?',
+        body: <>Hide <strong>{p.name}</strong> from the public shop. Existing orders are preserved and the product can be reactivated anytime.</>,
+        confirmLabel: 'Deactivate',
+        destructive: true,
+      });
+      if (!ok) return;
+    }
+    setBusyId(p.id);
+    try {
+      await api.updateProduct(p.id, { active });
+      await qc.invalidateQueries({ queryKey: ['products'] });
+      toast.success(active ? 'Product activated' : 'Product deactivated', p.name);
+    } catch (err) {
+      toast.error('Update failed', err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   async function pushOnchain(p: ProductDTO) {
     if (!publicClient) return;
@@ -283,6 +308,13 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
                   <RefreshIcon /> Sync USDC
                 </button>
               )}
+              <button
+                className={p.active ? 'action-btn-destructive' : 'action-btn-primary'}
+                disabled={busyId === p.id}
+                onClick={() => setActive(p, !p.active)}
+              >
+                {p.active ? <><UserOffIcon /> Deactivate</> : <><UserCheckIcon /> Reactivate</>}
+              </button>
             </div>
           </li>
         ))}
@@ -309,7 +341,7 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
                 <td>{p.physicalStock}</td>
                 <td>{p.active ? '✓' : '—'}</td>
                 <td className="whitespace-nowrap">
-                  <div className="inline-flex items-center gap-2">
+                  <div className="inline-flex flex-wrap items-center gap-2">
                     <button className="action-btn-ghost" onClick={() => setEditing(p.id)} disabled={busyId === p.id}>
                       <PencilIcon /> Edit
                     </button>
@@ -323,6 +355,13 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
                         <RefreshIcon /> Sync
                       </button>
                     )}
+                    <button
+                      className={p.active ? 'action-btn-destructive' : 'action-btn-primary'}
+                      disabled={busyId === p.id}
+                      onClick={() => setActive(p, !p.active)}
+                    >
+                      {p.active ? <><UserOffIcon /> Deactivate</> : <><UserCheckIcon /> Reactivate</>}
+                    </button>
                   </div>
                 </td>
               </tr>
