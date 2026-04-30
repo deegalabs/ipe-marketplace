@@ -45,14 +45,16 @@ const COIN_CONFIGS: Record<string, CoinConfig> = {
   etharb: { scheme: 'eip681-native', chainId: 42161 },
 
   // ── ERC-20 stablecoins ────────────────────────────────────
-  // USDT
+  // USDT — bare `usdt` ticker resolves to Ethereum mainnet (canonical USDT).
+  usdt:      { scheme: 'eip681-token', chainId: 1,    contract: '0xdAC17F958D2ee523a2206206994597C13D831ec7', decimals: 6  },
   usdterc20: { scheme: 'eip681-token', chainId: 1,    contract: '0xdAC17F958D2ee523a2206206994597C13D831ec7', decimals: 6  },
   usdtbsc:   { scheme: 'eip681-token', chainId: 56,   contract: '0x55d398326f99059fF775485246999027B3197955', decimals: 18 },
   usdtmatic: { scheme: 'eip681-token', chainId: 137,  contract: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', decimals: 6  },
   usdtarb:   { scheme: 'eip681-token', chainId: 42161,contract: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', decimals: 6  },
   usdtop:    { scheme: 'eip681-token', chainId: 10,   contract: '0x94b008aA00579c1307B0EF2c499aD98a8ce58e58', decimals: 6  },
 
-  // USDC
+  // USDC — bare `usdc` ticker resolves to Ethereum mainnet.
+  usdc:      { scheme: 'eip681-token', chainId: 1,    contract: '0xA0b86991c6218B36c1D19D4a2e9Eb0cE3606eB48', decimals: 6 },
   usdcerc20: { scheme: 'eip681-token', chainId: 1,    contract: '0xA0b86991c6218B36c1D19D4a2e9Eb0cE3606eB48', decimals: 6 },
   usdcmatic: { scheme: 'eip681-token', chainId: 137,  contract: '0x3c499c542cef5E3811e1192ce70d8cC03d5c3359', decimals: 6 },
   usdcbsc:   { scheme: 'eip681-token', chainId: 56,   contract: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', decimals: 6 },

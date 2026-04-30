@@ -98,7 +98,10 @@ const TICKER_LABELS: Record<string, string> = {
   ethop: 'ETH (Optimism)',
   arb: 'Arbitrum',
   op: 'Optimism',
-  // USDT — every chain we've seen
+  // USDT — every chain we've seen. Bare `usdt` ticker is canonical Ethereum
+  // mainnet on NOWPayments; some merchants list it that way alongside the
+  // explicit chain variants.
+  usdt:      'USDT (Ethereum)',
   usdterc20: 'USDT (Ethereum)',
   usdttrc20: 'USDT (Tron)',
   usdtbsc:   'USDT (BSC)',
@@ -110,7 +113,8 @@ const TICKER_LABELS: Record<string, string> = {
   usdtbase:  'USDT (Base)',
   usdtnear:  'USDT (NEAR)',
   usdtalgo:  'USDT (Algorand)',
-  // USDC — every chain we've seen
+  // USDC — every chain we've seen. Bare `usdc` defaults to Ethereum mainnet.
+  usdc:      'USDC (Ethereum)',
   usdcerc20: 'USDC (Ethereum)',
   usdcmatic: 'USDC (Polygon)',
   usdcsol:   'USDC (Solana)',
