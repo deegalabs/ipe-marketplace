@@ -16,6 +16,48 @@
 
   html, body {
     overscroll-behavior-y: contain;
+    scroll-behavior: smooth;
+    /* Header is sticky (~64px) — keep anchor jumps below it instead of
+       behind it. Mobile bottom nav is fixed so no top-padding concern. */
+    scroll-padding-top: 76px;
+  }
+  /* Don't smooth-scroll for users who explicitly opted out of motion. */
+  @media (prefers-reduced-motion: reduce) {
+    html, body { scroll-behavior: auto; }
+  }
+
+  /* ── Slim, brand-tinted scrollbars ─────────────────────────────
+     Default chrome scrollbar is thick + neutral grey, looks dated and
+     clashes with the warm cream/navy palette. WebKit + Firefox both
+     get matched treatments. */
+  * {
+    scrollbar-width: thin;                                      /* Firefox */
+    scrollbar-color: theme('colors.ipe.stone.300') transparent; /* thumb · track */
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: theme('colors.ipe.stone.300');
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: theme('colors.ipe.stone.400');
+  }
+  html.dark * {
+    scrollbar-color: rgb(248 245 236 / 0.2) transparent;
+  }
+  html.dark *::-webkit-scrollbar-thumb {
+    background-color: rgb(248 245 236 / 0.2);
+  }
+  html.dark *::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(248 245 236 / 0.35);
   }
 
   body {
