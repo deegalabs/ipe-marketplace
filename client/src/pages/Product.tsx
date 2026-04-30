@@ -7,7 +7,6 @@ import { IpeMarketAbi } from '@ipe/shared';
 import { api } from '../api';
 import { env, TOKENS, type CryptoToken } from '../config';
 import { priceDisplay, formatToken, formatBrl } from '../lib/format';
-import { useCurrency } from '../lib/currency';
 import { ShippingForm, type ShippingFormValues } from '../components/ShippingForm';
 import { PickupForm, type PickupFormValues } from '../components/PickupForm';
 import { GatewayCheckout } from '../components/GatewayCheckout';
@@ -25,7 +24,6 @@ export function ProductPage() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
-  const { currency, rates } = useCurrency();
 
   // For the public launch, only gateway flow is exposed (PIX + crypto-via-NOWPayments).
   // The direct onchain `buy()` path still works in the contract but is hidden in the UI
@@ -158,7 +156,7 @@ export function ProductPage() {
             {p.name}
           </h1>
           <p className="text-2xl mt-3 font-mono tabular-nums text-ipe-ink">
-            {priceDisplay(p, currency, rates)}
+            {priceDisplay(p)}
           </p>
           <p className="text-ipe-ink-70 mt-5 text-sm sm:text-base leading-relaxed max-w-prose">
             {p.description}

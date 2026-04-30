@@ -1,16 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
-import { api } from '../api';
+import { api, type ProductDTO } from '../api';
 import { priceDisplay } from '../lib/format';
-import { useCurrency } from '../lib/currency';
 
 export function Shop() {
   const { data, isLoading, error } = useQuery({ queryKey: ['products'], queryFn: api.listProducts });
-  const { currency, rates } = useCurrency();
 
   if (isLoading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-12">
         <Hero />
         <SkeletonGrid />
       </div>
@@ -21,7 +19,7 @@ export function Shop() {
   const items = (data ?? []).filter((p) => p.active);
   if (!items.length) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-12">
         <Hero />
         <p className="text-ipe-ink-50 text-center py-12">No products listed yet.</p>
       </div>
@@ -29,64 +27,116 @@ export function Shop() {
   }
 
   return (
-    <div className="space-y-8 sm:space-y-10">
-      <Hero />
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
-        {items.map((p, i) => (
-          <Link
-            key={p.id}
-            href={`/product/${p.id}`}
-            className="card-interactive group block animate-fade-up"
-            style={{ animationDelay: `${i * 60}ms` }}
-          >
-            <div className="aspect-square overflow-hidden bg-ipe-stone-100">
-              <img
-                src={p.imageUrl}
-                alt={p.name}
-                className="w-full h-full object-cover transition-transform duration-350 ease-smooth group-hover:scale-105"
-                loading="lazy"
-              />
-            </div>
-            <div className="p-3 sm:p-4">
-              <p className="font-medium tracking-tight text-ipe-ink leading-tight">{p.name}</p>
-              <p className="text-sm text-ipe-ink-70 mt-1 font-mono tabular-nums">
-                {priceDisplay(p, currency, rates)}
-              </p>
-              <div className="flex items-center gap-1 mt-2.5 flex-wrap">
-                {p.tokenId === null && <span className="badge-warn">offline</span>}
-                {p.pickupAvailable && <span className="badge-green">pickup</span>}
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
+    <div className="space-y-10 sm:space-y-14">
+      <Hero count={items.length} />
+      <ProductGrid items={items} />
     </div>
   );
 }
 
-function Hero() {
+function Hero({ count }: { count?: number }) {
   return (
-    <section className="text-center sm:text-left max-w-2xl">
-      <p className="text-2xs font-semibold uppercase tracking-widest text-ipe-gold-600 dark:text-ipe-gold mb-3">
-        Limited drop · onchain receipts
-      </p>
-      <h1 className="text-hero sm:text-display font-display text-ipe-green-700 dark:text-ipe-cream-100 leading-[1.05]">
-        Wear the city.
-      </h1>
-      <p className="mt-4 text-ipe-ink-70 dark:text-ipe-cream-100/70 text-base sm:text-lg max-w-prose">
-        Community merch for ipê.city — every purchase is recorded on Base and ships from the next event.
-      </p>
+    <section className="relative">
+      {/* Subtle gold accent — only on the upper-right of the hero */}
+      <div
+        aria-hidden
+        className="absolute -top-12 right-0 w-72 h-72 rounded-full bg-ipe-gold/10 blur-3xl pointer-events-none"
+      />
+      <div className="relative max-w-3xl space-y-5">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ipe-gold/15 border border-ipe-gold/30">
+          <span className="w-1.5 h-1.5 rounded-full bg-ipe-gold animate-pulse-subtle" />
+          <span className="text-2xs font-semibold uppercase tracking-widest text-ipe-gold-600 dark:text-ipe-gold">
+            Limited drop · Onchain receipts
+          </span>
+        </div>
+        <h1 className="text-hero sm:text-display font-display text-ipe-green-700 leading-[0.95]">
+          Wear the city.<br />
+          <span className="text-ipe-ink-70 font-medium">Carry the chain.</span>
+        </h1>
+        <p className="text-ipe-ink-70 text-base sm:text-lg max-w-prose leading-relaxed">
+          Community merch for ipê.city — every purchase recorded on Base, paid in any currency,
+          shipped from the next event.
+        </p>
+        {count !== undefined && (
+          <div className="flex items-center gap-4 pt-2 text-2xs uppercase tracking-widest text-ipe-ink-50">
+            <span>{count} pieces available</span>
+            <span className="w-1 h-1 rounded-full bg-ipe-ink-30" />
+            <span>USD pricing</span>
+            <span className="w-1 h-1 rounded-full bg-ipe-ink-30" />
+            <span>Free pickup</span>
+          </div>
+        )}
+      </div>
     </section>
+  );
+}
+
+function ProductGrid({ items }: { items: ProductDTO[] }) {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+      {items.map((p, i) => (
+        <ProductCard key={p.id} product={p} index={i} />
+      ))}
+    </div>
+  );
+}
+
+function ProductCard({ product, index }: { product: ProductDTO; index: number }) {
+  return (
+    <Link
+      href={`/product/${product.id}`}
+      className="group relative block rounded-lg overflow-hidden bg-white dark:bg-ipe-green-700/40 border border-ipe-stone-200/60 dark:border-ipe-green-500/20 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-350 ease-smooth animate-fade-up"
+      style={{ animationDelay: `${index * 70}ms` }}
+    >
+      <div className="relative aspect-square overflow-hidden bg-ipe-stone-100 dark:bg-ipe-green-800/40">
+        <img
+          src={product.imageUrl}
+          alt={product.name}
+          className="w-full h-full object-cover transition-transform duration-500 ease-smooth group-hover:scale-110"
+          loading="lazy"
+        />
+        {/* Soft top-bottom gradient for label readability + premium feel */}
+        <div
+          aria-hidden
+          className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-350"
+        />
+        {/* Status badges, top-left */}
+        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1">
+          {product.tokenId === null && (
+            <span className="badge bg-amber-100/95 text-amber-800 backdrop-blur">offline</span>
+          )}
+        </div>
+        {/* Category eyebrow, top-right */}
+        <span className="absolute top-2.5 right-2.5 text-2xs font-semibold uppercase tracking-widest text-white/90 px-2 py-0.5 rounded-xs bg-ipe-ink/40 backdrop-blur opacity-0 group-hover:opacity-100 transition-opacity duration-350">
+          {product.category}
+        </span>
+      </div>
+      <div className="p-4">
+        <p className="font-medium tracking-tight text-ipe-ink leading-snug line-clamp-2">{product.name}</p>
+        <div className="flex items-baseline justify-between mt-2 gap-2">
+          <p className="text-base font-mono font-semibold tabular-nums text-ipe-ink">
+            {priceDisplay(product)}
+          </p>
+          <span className="text-2xs uppercase tracking-wider text-ipe-ink-50">USD</span>
+        </div>
+        {product.pickupAvailable && (
+          <p className="mt-3 text-2xs uppercase tracking-widest text-ipe-green-700 dark:text-ipe-gold flex items-center gap-1.5">
+            <span className="w-1 h-1 rounded-full bg-ipe-green-700 dark:bg-ipe-gold" />
+            Pickup at event
+          </p>
+        )}
+      </div>
+    </Link>
   );
 }
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="card overflow-hidden">
           <div className="aspect-square bg-ipe-stone-100 animate-pulse-subtle" />
-          <div className="p-3 sm:p-4 space-y-2">
+          <div className="p-4 space-y-2">
             <div className="h-4 bg-ipe-stone-100 rounded animate-pulse-subtle w-2/3" />
             <div className="h-3 bg-ipe-stone-100 rounded animate-pulse-subtle w-1/3" />
           </div>

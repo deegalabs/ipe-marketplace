@@ -5,10 +5,10 @@ import { Shop } from './pages/Shop';
 import { ProductPage } from './pages/Product';
 import { Orders } from './pages/Orders';
 import { Admin } from './pages/Admin';
-import { CurrencyToggle } from './lib/currency';
 import { InstallPrompt } from './components/InstallPrompt';
-import { Logo } from './components/Logo';
+import { Logo, FlowerMark } from './components/Logo';
 import { ThemeToggle } from './components/ThemeToggle';
+import { ShopIcon, OrdersIcon } from './components/icons';
 import { api } from './api';
 
 export function App() {
@@ -28,10 +28,42 @@ export function App() {
       </main>
       <BottomNav />
       <InstallPrompt />
-      <footer className="hidden sm:block text-center text-2xs text-ipe-ink-30 py-8 tracking-wide">
-        IPÊ STORE · ONCHAIN ON BASE · MERCH BY IPÊ.CITY
-      </footer>
+      <Footer />
     </div>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="hidden sm:block border-t border-ipe-stone-200/60 mt-12">
+      <div className="max-w-6xl mx-auto px-4 py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <FlowerMark className="text-ipe-gold" size={20} />
+            <span className="font-display font-semibold text-ipe-ink tracking-tight">Ipê Store</span>
+          </div>
+          <p className="text-sm text-ipe-ink-70 max-w-xs">
+            Community merch for ipê.city — every purchase recorded on Base, paid in any currency.
+          </p>
+        </div>
+        <div className="space-y-2 text-sm">
+          <p className="text-2xs uppercase tracking-widest text-ipe-ink-50 mb-3">Shop</p>
+          <Link href="/" className="block text-ipe-ink-70 hover:text-ipe-green-700">All products</Link>
+          <Link href="/orders" className="block text-ipe-ink-70 hover:text-ipe-green-700">My orders</Link>
+        </div>
+        <div className="space-y-2 text-sm">
+          <p className="text-2xs uppercase tracking-widest text-ipe-ink-50 mb-3">Network</p>
+          <a href="https://ipe.city" target="_blank" rel="noreferrer" className="block text-ipe-ink-70 hover:text-ipe-green-700">ipê.city ↗</a>
+          <a href="https://base.org" target="_blank" rel="noreferrer" className="block text-ipe-ink-70 hover:text-ipe-green-700">Built on Base ↗</a>
+        </div>
+      </div>
+      <div className="border-t border-ipe-stone-200/40">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-2 text-2xs text-ipe-ink-50">
+          <span>© {new Date().getFullYear()} ipê.city · all rights reserved</span>
+          <span className="font-mono">onchain receipts · paid in any currency</span>
+        </div>
+      </div>
+    </footer>
   );
 }
 
@@ -53,7 +85,6 @@ function Header() {
           <nav className="hidden sm:flex gap-6 text-sm font-medium">
             <NavLink href="/" label="Shop" />
             <NavLink href="/orders" label="My orders" />
-            <NavLink href="/admin" label="Admin" />
           </nav>
           {/* On mobile, the connect button sits next to the brand */}
           <div className="sm:hidden">
@@ -70,7 +101,6 @@ function Header() {
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           <ThemeToggle />
-          <CurrencyToggle />
           {/* Desktop connect button stays in the header */}
           <div className="hidden sm:block">
             {authenticated && wallet ? (
@@ -166,32 +196,35 @@ function AdminGate() {
 }
 
 /// Native-feeling bottom nav for mobile. Hidden on desktop (≥sm) where the
-/// header links cover the same routes.
+/// header links cover the same routes. Admin is intentionally not here —
+/// admins reach /admin by typing the URL.
 function BottomNav() {
   const [pathname] = useLocation();
   const items = [
-    { href: '/', label: 'Shop', icon: '🛍' },
-    { href: '/orders', label: 'Orders', icon: '🧾' },
-    { href: '/admin', label: 'Admin', icon: '⚙' },
+    { href: '/', label: 'Shop', Icon: ShopIcon },
+    { href: '/orders', label: 'Orders', Icon: OrdersIcon },
   ];
   return (
     <nav
       className="sm:hidden fixed bottom-0 inset-x-0 z-20 glass border-t border-ipe-stone-200/60"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="grid grid-cols-3">
+      <div className="grid grid-cols-2">
         {items.map((it) => {
           const active = it.href === '/' ? pathname === '/' : pathname.startsWith(it.href);
           return (
             <Link
               key={it.href}
               href={it.href}
-              className={`flex flex-col items-center justify-center py-2.5 text-2xs transition-colors duration-250 ease-smooth ${
-                active ? 'text-ipe-green-700 font-semibold' : 'text-ipe-ink-50'
+              className={`relative flex flex-col items-center justify-center py-3 gap-1 text-2xs font-medium transition-colors duration-250 ease-smooth ${
+                active ? 'text-ipe-green-700' : 'text-ipe-ink-50 hover:text-ipe-ink-70'
               }`}
             >
-              <span className="text-lg leading-none mb-0.5">{it.icon}</span>
-              {it.label}
+              <it.Icon size={22} strokeWidth={active ? 2 : 1.6} />
+              <span className="tracking-wide">{it.label}</span>
+              {active && (
+                <span className="absolute top-1 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-ipe-gold" />
+              )}
             </Link>
           );
         })}

@@ -8,7 +8,6 @@ import { api, type ProductDTO, type OrderDTO, type AdminUserDTO } from '../api';
 import { env } from '../config';
 import { formatToken, formatBrl } from '../lib/format';
 import { normalizeImageUrl } from '../lib/imageUrl';
-import { useCurrency } from '../lib/currency';
 
 export function Admin() {
   const { user, logout } = usePrivy();
@@ -314,7 +313,7 @@ interface ProductFormProps {
 }
 
 function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormProps) {
-  const { rates } = useCurrency();
+  const { data: rates } = useQuery({ queryKey: ['rates'], queryFn: api.rates, refetchInterval: 60_000 });
   const [draft, setDraft] = useState<ProductDraft>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { baseSepolia } from 'viem/chains';
 import { App } from './App';
 import { env, wagmiConfig } from './config';
-import { CurrencyProvider } from './lib/currency';
 import { ThemeProvider } from './lib/theme';
 import { setPrivyTokenGetter } from './api';
 import './styles.css';
@@ -38,11 +37,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <WagmiProvider config={wagmiConfig}>
           <ThemeProvider>
-            <CurrencyProvider>
-              <PrivyApiBridge>
-                <App />
-              </PrivyApiBridge>
-            </CurrencyProvider>
+            <PrivyApiBridge>
+              <App />
+            </PrivyApiBridge>
           </ThemeProvider>
         </WagmiProvider>
       </QueryClientProvider>
