@@ -88,11 +88,13 @@ export function paymentUriFor(ticker: string, address: string, amount: number): 
       return `${cfg.bip21Prefix}:${address}?amount=${amount}`;
     case 'eip681-native': {
       const wei = humanToSmallestUnit(amount, 18);
-      return `ethereum:${address}@${cfg.chainId}?value=${wei}`;
+      // `amount` is a non-standard hint for parsers (e.g. Yodl) that don't
+      // convert wei→human themselves. Strict EIP-681 parsers ignore it.
+      return `ethereum:${address}@${cfg.chainId}?value=${wei}&amount=${amount}`;
     }
     case 'eip681-token': {
       const units = humanToSmallestUnit(amount, cfg.decimals ?? 18);
-      return `ethereum:${cfg.contract}@${cfg.chainId}/transfer?address=${address}&uint256=${units}`;
+      return `ethereum:${cfg.contract}@${cfg.chainId}/transfer?address=${address}&uint256=${units}&amount=${amount}`;
     }
     case 'solana':
       return `solana:${address}?amount=${amount}`;
