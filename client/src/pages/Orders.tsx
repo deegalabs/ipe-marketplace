@@ -8,6 +8,7 @@ import { formatToken, formatBrl } from '../lib/format';
 import { ProductImage } from '../components/ProductImage';
 import { SkeletonBox, SkeletonText } from '../components/Skeleton';
 import { useToast } from '../lib/toast';
+import { useConfirm } from '../lib/confirm';
 
 export function Orders() {
   const { address } = useAccount();
@@ -117,12 +118,17 @@ function OrderRow({ order: o, product }: { order: OrderDTO; product: ProductDTO 
 function CancelOrderButton({ order: o }: { order: OrderDTO }) {
   const qc = useQueryClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
 
   async function cancel() {
-    const ok = window.confirm(
-      'Cancel this order?\n\nIf you have already sent the payment, do NOT cancel — wait for confirmation. Once cancelled, any funds you send afterwards will not be credited automatically.',
-    );
+    const ok = await confirm({
+      title: 'Cancel this order?',
+      body: 'The order will be marked as cancelled and removed from the active list.',
+      warning: "If you've already sent the payment, do NOT cancel — wait for confirmation. Funds sent after cancelling won't be credited automatically.",
+      confirmLabel: 'Yes, cancel',
+      destructive: true,
+    });
     if (!ok) return;
     setBusy(true);
     try {
@@ -164,13 +170,18 @@ function ResumePaymentButton({ order: o }: { order: OrderDTO }) {
 function ResumePaymentModal({ order: o, onClose }: { order: OrderDTO; onClose: () => void }) {
   const qc = useQueryClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const [copied, setCopied] = useState<'address' | 'amount' | 'pix' | null>(null);
   const [cancelling, setCancelling] = useState(false);
 
   async function cancel() {
-    const ok = window.confirm(
-      'Cancel this order?\n\nIf you have already sent the payment, do NOT cancel — wait for confirmation. Once cancelled, any funds you send afterwards will not be credited automatically.',
-    );
+    const ok = await confirm({
+      title: 'Cancel this order?',
+      body: 'The order will be marked as cancelled and removed from the active list.',
+      warning: "If you've already sent the payment, do NOT cancel — wait for confirmation. Funds sent after cancelling won't be credited automatically.",
+      confirmLabel: 'Yes, cancel',
+      destructive: true,
+    });
     if (!ok) return;
     setCancelling(true);
     try {

@@ -8,6 +8,7 @@ import { App } from './App';
 import { env, wagmiConfig } from './config';
 import { ThemeProvider } from './lib/theme';
 import { ToastProvider } from './lib/toast';
+import { ConfirmProvider } from './lib/confirm';
 import { setPrivyTokenGetter } from './api';
 import './styles.css';
 
@@ -39,9 +40,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <WagmiProvider config={wagmiConfig}>
           <ThemeProvider>
             <ToastProvider>
-              <PrivyApiBridge>
-                <App />
-              </PrivyApiBridge>
+              <ConfirmProvider>
+                <PrivyApiBridge>
+                  <App />
+                </PrivyApiBridge>
+              </ConfirmProvider>
             </ToastProvider>
           </ThemeProvider>
         </WagmiProvider>

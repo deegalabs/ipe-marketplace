@@ -9,6 +9,7 @@ import { env } from '../config';
 import { formatToken, formatBrl } from '../lib/format';
 import { normalizeImageUrl } from '../lib/imageUrl';
 import { useToast } from '../lib/toast';
+import { useConfirm } from '../lib/confirm';
 import { SkeletonBox, SkeletonText } from '../components/Skeleton';
 import { InstallPosterModal } from '../components/InstallPosterModal';
 import {
@@ -638,6 +639,7 @@ function ImageUrlField({ value, onChange }: { value: string; onChange: (v: strin
 function AdminsCard({ currentAdminId }: { currentAdminId: string | undefined }) {
   const qc = useQueryClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const adminsQ = useQuery({ queryKey: ['admins'], queryFn: api.listAdmins });
   const [newEmail, setNewEmail] = useState('');
   const [newName, setNewName] = useState('');
@@ -674,7 +676,13 @@ function AdminsCard({ currentAdminId }: { currentAdminId: string | undefined }) 
   }
 
   async function remove(a: AdminUserDTO) {
-    if (!confirm(`Deactivate ${a.email}?`)) return;
+    const ok = await confirm({
+      title: 'Remove admin?',
+      body: <>Deactivate access for <strong>{a.email}</strong>. They'll no longer be able to sign in to the admin panel until reactivated.</>,
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       await api.removeAdmin(a.id);
       await qc.invalidateQueries({ queryKey: ['admins'] });
