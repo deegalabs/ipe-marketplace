@@ -67,7 +67,7 @@ export function Shop() {
 function Hero() {
   return (
     <section className="text-center sm:text-left max-w-2xl">
-      <p className="text-2xs font-semibold uppercase tracking-widest text-ipe-gold-600 dark:text-ipe-gold-DEFAULT mb-3">
+      <p className="text-2xs font-semibold uppercase tracking-widest text-ipe-gold-600 dark:text-ipe-gold mb-3">
         Limited drop · onchain receipts
       </p>
       <h1 className="text-hero sm:text-display font-display text-ipe-green-700 dark:text-ipe-cream-100 leading-[1.05]">

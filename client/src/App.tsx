@@ -29,7 +29,7 @@ export function App() {
       <BottomNav />
       <InstallPrompt />
       <footer className="hidden sm:block text-center text-2xs text-ipe-ink-30 py-8 tracking-wide">
-        IPE STORE · ONCHAIN ON BASE · MERCH BY IPÊ.CITY
+        IPÊ STORE · ONCHAIN ON BASE · MERCH BY IPÊ.CITY
       </footer>
     </div>
   );
@@ -100,7 +100,7 @@ function NavLink({ href, label }: { href: string; label: string }) {
       }`}
     >
       {label}
-      {active && <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-ipe-gold-DEFAULT rounded-full" />}
+      {active && <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-ipe-gold rounded-full" />}
     </Link>
   );
 }

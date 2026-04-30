@@ -77,7 +77,7 @@
     @apply btn bg-ipe-green-600 text-ipe-cream-50
            hover:bg-ipe-green-700 hover:-translate-y-px hover:shadow-md
            active:translate-y-0 active:shadow-sm
-           dark:bg-ipe-gold-DEFAULT dark:text-ipe-green-800
+           dark:bg-ipe-gold dark:text-ipe-green-800
            dark:hover:bg-ipe-gold-300;
   }
 
@@ -96,7 +96,7 @@
   }
 
   .btn-gold {
-    @apply btn bg-ipe-gold-DEFAULT text-ipe-green-700
+    @apply btn bg-ipe-gold text-ipe-green-700
            hover:bg-ipe-gold-300 hover:-translate-y-px hover:shadow-md;
   }
 
@@ -109,7 +109,7 @@
 
   .card-interactive {
     @apply card hover:shadow-md hover:-translate-y-0.5 hover:border-ipe-stone-300
-           dark:hover:border-ipe-gold-DEFAULT/40;
+           dark:hover:border-ipe-gold/40;
   }
 
   /* ── Form fields ──────────────────────────────────────────── */
@@ -121,7 +121,7 @@
            disabled:opacity-50 disabled:cursor-not-allowed
            dark:bg-ipe-green-800/60 dark:border-ipe-green-500/30 dark:text-ipe-cream-100
            dark:placeholder:text-ipe-cream-100/30
-           dark:focus:border-ipe-gold-DEFAULT dark:focus:ring-ipe-gold-DEFAULT/20;
+           dark:focus:border-ipe-gold dark:focus:ring-ipe-gold/20;
     min-height: 44px;
   }
 

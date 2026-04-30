@@ -71,7 +71,7 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
     if (parsed.data.paymentMethod === 'pix') {
       const charge = await createPixCharge({
         amountCents: Number(totalPaid),
-        description: `IPE Store · ${product.name} ×${parsed.data.quantity}`,
+        description: `Ipê Store · ${product.name} ×${parsed.data.quantity}`,
         payerEmail: parsed.data.customerEmail,
         externalReference: order.id,
       });
@@ -95,7 +95,7 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
     } else {
       const invoice = await createInvoice({
         priceUsd: Number(totalPaid) / 1e6, // USDC has 6 decimals → USD value
-        description: `IPE Store · ${product.name} ×${parsed.data.quantity}`,
+        description: `Ipê Store · ${product.name} ×${parsed.data.quantity}`,
         externalReference: order.id,
       });
       const [updated] = await db

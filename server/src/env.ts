@@ -49,7 +49,7 @@ const envSchema = z.object({
   /// Resend (transactional email). https://resend.com
   RESEND_API_KEY: z.string().default(''),
   /// Verified sender (must be on a domain you've added to Resend).
-  RESEND_FROM_EMAIL: z.string().default('IPE Store <orders@ipecity.example>'),
+  RESEND_FROM_EMAIL: z.string().default('Ipê Store <orders@ipecity.example>'),
   /// Where admin-alert emails go. Empty = skip admin emails.
   ADMIN_NOTIFICATION_EMAIL: z.string().default(''),
 

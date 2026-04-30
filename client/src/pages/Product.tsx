@@ -253,7 +253,7 @@ function PaymentSelector({ value, onChange, enabled, priceIpe, priceUsdc, priceB
               } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
             >
               {selected && (
-                <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-ipe-gold-DEFAULT" />
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-ipe-gold" />
               )}
               <div className="font-semibold text-ipe-ink">{o.label}</div>
               <div className="text-sm font-mono tabular-nums text-ipe-ink-70 mt-0.5">{o.price}</div>
@@ -297,7 +297,7 @@ function DeliverySelector({
               } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
             >
               {selected && (
-                <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-ipe-gold-DEFAULT" />
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-ipe-gold" />
               )}
               <div className="font-semibold text-ipe-ink">{o.label}</div>
               <div className="text-2xs uppercase tracking-wider text-ipe-ink-50 mt-1">{o.desc}</div>

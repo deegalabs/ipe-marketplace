@@ -1,6 +1,6 @@
-/// IPE Store brand mark — geometric ipê flower (5 radial petals).
+/// Ipê Store brand mark — geometric ipê flower (5 radial petals).
 /// Renders as inline SVG so it scales crisply and respects currentColor for
-/// the petals (use `text-ipe-gold-DEFAULT` on the parent to recolor).
+/// the petals (use `text-ipe-gold` on the parent to recolor).
 export function FlowerMark({ className = '', size = 28 }: { className?: string; size?: number }) {
   return (
     <svg
@@ -30,10 +30,10 @@ export function FlowerMark({ className = '', size = 28 }: { className?: string; 
 export function Logo({ compact = false }: { compact?: boolean }) {
   return (
     <span className="inline-flex items-center gap-2 select-none">
-      <FlowerMark className="text-ipe-gold-DEFAULT" size={28} />
+      <FlowerMark className="text-ipe-gold" size={28} />
       {!compact && (
         <span className="font-display font-bold text-ipe-green-600 dark:text-ipe-cream-100 text-xl tracking-tight leading-none">
-          IPE <span className="text-ipe-ink dark:text-ipe-cream-100/70 font-medium">Store</span>
+          Ipê <span className="text-ipe-ink dark:text-ipe-cream-100/70 font-medium">Store</span>
         </span>
       )}
     </span>

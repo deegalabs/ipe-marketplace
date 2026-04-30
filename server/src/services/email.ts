@@ -39,12 +39,12 @@ const layout = (title: string, body: string) => `
 <!doctype html>
 <html><body style="font-family:-apple-system,Segoe UI,Roboto,Inter,sans-serif;background:#f8f5ec;padding:24px;color:#0e0e0c;">
   <div style="max-width:540px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;border:1px solid rgba(10,58,47,0.1);">
-    <h1 style="color:#0a3a2f;font-size:22px;margin:0 0 16px;">IPE Store</h1>
+    <h1 style="color:#0a3a2f;font-size:22px;margin:0 0 16px;">Ipê Store</h1>
     <h2 style="font-size:18px;margin:0 0 12px;">${title}</h2>
     ${body}
     <hr style="border:none;border-top:1px solid rgba(10,58,47,0.1);margin:24px 0;">
     <p style="font-size:12px;color:rgba(14,14,12,0.5);margin:0;">
-      You received this because you placed an order at IPE Store. Order details: <a href="${env.PUBLIC_APP_URL}/orders" style="color:#0a3a2f;">${env.PUBLIC_APP_URL}/orders</a>
+      You received this because you placed an order at Ipê Store. Order details: <a href="${env.PUBLIC_APP_URL}/orders" style="color:#0a3a2f;">${env.PUBLIC_APP_URL}/orders</a>
     </p>
   </div>
 </body></html>`;
@@ -76,7 +76,7 @@ export async function sendOrderCreated(order: Order, product: Product) {
   `;
   await send({
     to: order.customerEmail,
-    subject: `Your IPE Store order — ${product.name}`,
+    subject: `Your Ipê Store order — ${product.name}`,
     html: layout('Order received', body),
   });
 }
@@ -148,7 +148,7 @@ export async function sendAdminNewOrder(order: Order, product: Product) {
   `;
   await send({
     to: env.ADMIN_NOTIFICATION_EMAIL,
-    subject: `[IPE Store] new order — ${product.name}`,
+    subject: `[Ipê Store] new order — ${product.name}`,
     html: layout('New order', body),
   });
 }
