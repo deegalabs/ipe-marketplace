@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { eq } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { createDirectOrderInputSchema, orderStatusEnum } from '@ipe/shared';
 import { db, schema } from '../db/client.js';
@@ -90,6 +90,39 @@ ordersRouter.patch('/admin/:id', requireAdmin, async (req, res) => {
   }
 
   res.json(serializeOrder(row, true));
+});
+
+/// Public cancel — buyer initiated. Idempotent + race-safe: the UPDATE only
+/// succeeds while the order is still pre-paid, so a webhook landing in the
+/// same millisecond as the cancel will either flip status to 'paid' first
+/// (cancel becomes a no-op returning 409) or after (cancel wins and the
+/// webhook's claim UPDATE finds nothing — payment gets ignored).
+///
+/// Auth model: order IDs are unguessable UUIDs and are only surfaced to the
+/// buyer (My Orders, post-checkout polling), so knowing the ID is treated as
+/// authorization for cancel. No wallet signature required — most gateway
+/// orders don't have a wallet attached.
+ordersRouter.post('/:id/cancel', async (req, res) => {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) {
+    return res.status(404).json({ error: 'not found' });
+  }
+  const [updated] = await db
+    .update(schema.orders)
+    .set({ status: 'cancelled', updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.orders.id, req.params.id),
+        inArray(schema.orders.status, ['pending', 'awaiting_payment'] as const),
+      ),
+    )
+    .returning();
+  if (!updated) {
+    // Either the order doesn't exist or it's already past the pre-paid window.
+    const existing = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
+    if (!existing) return res.status(404).json({ error: 'not found' });
+    return res.status(409).json({ error: `cannot cancel order with status '${existing.status}'` });
+  }
+  res.json(serializeOrder(updated, false));
 });
 
 /// Public lookup for an order by id (used by the gateway flow to poll status while

@@ -164,6 +164,10 @@ export const api = {
   /// Local-dev only — manually mark a gateway order as paid (simulates webhook).
   devConfirmGatewayOrder: (id: string) =>
     request<{ ok: true }>(`/orders/gateway/${id}/dev-confirm`, { method: 'POST' }),
+  /// Buyer-initiated cancel. Only succeeds while the order is in 'pending'
+  /// or 'awaiting_payment' — once paid, status changes go through admin.
+  cancelOrder: (id: string) =>
+    request<OrderDTO>(`/orders/${id}/cancel`, { method: 'POST' }),
 
   treasury: () => request<TreasuryDTO>('/treasury'),
   rates: () => request<Rates>('/rates'),

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAccount } from 'wagmi';
 import { Link } from 'wouter';
 import { api, type OrderDTO, type ProductDTO } from '../api';
@@ -92,12 +92,46 @@ function OrderRow({ order: o, product }: { order: OrderDTO; product: ProductDTO 
 
           <FulfillmentTimeline status={o.status} delivery={o.deliveryMethod} />
 
-          {o.status === 'awaiting_payment' && <ResumePaymentButton order={o} />}
+          {(o.status === 'awaiting_payment' || o.status === 'pending') && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {o.status === 'awaiting_payment' && <ResumePaymentButton order={o} />}
+              <CancelOrderButton order={o} />
+            </div>
+          )}
 
           <TxLink order={o} />
         </div>
       </div>
     </li>
+  );
+}
+
+function CancelOrderButton({ order: o }: { order: OrderDTO }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  async function cancel() {
+    const ok = window.confirm(
+      'Cancel this order?\n\nIf you have already sent the payment, do NOT cancel — wait for confirmation. Once cancelled, any funds you send afterwards will not be credited automatically.',
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await api.cancelOrder(o.id);
+      await qc.invalidateQueries({ queryKey: ['orders'] });
+      toast.success('Order cancelled');
+    } catch (err) {
+      toast.error('Could not cancel', err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button type="button" onClick={cancel} disabled={busy} className="btn-ghost text-xs">
+      {busy ? 'Cancelling…' : 'Cancel order'}
+    </button>
   );
 }
 
@@ -124,8 +158,28 @@ function ResumePaymentButton({ order: o }: { order: OrderDTO }) {
 /// paying after closing the original checkout. Mirrors GatewayCheckout's
 /// confirmation surface but read-only — no order-creation calls here.
 function ResumePaymentModal({ order: o, onClose }: { order: OrderDTO; onClose: () => void }) {
+  const qc = useQueryClient();
   const toast = useToast();
   const [copied, setCopied] = useState<'address' | 'amount' | 'pix' | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+
+  async function cancel() {
+    const ok = window.confirm(
+      'Cancel this order?\n\nIf you have already sent the payment, do NOT cancel — wait for confirmation. Once cancelled, any funds you send afterwards will not be credited automatically.',
+    );
+    if (!ok) return;
+    setCancelling(true);
+    try {
+      await api.cancelOrder(o.id);
+      await qc.invalidateQueries({ queryKey: ['orders'] });
+      toast.success('Order cancelled');
+      onClose();
+    } catch (err) {
+      toast.error('Could not cancel', err instanceof Error ? err.message : String(err));
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   function copy(value: string, kind: 'address' | 'amount' | 'pix') {
     void navigator.clipboard.writeText(value).then(() => {
@@ -270,6 +324,17 @@ function ResumePaymentModal({ order: o, onClose }: { order: OrderDTO; onClose: (
           <p className="text-2xs text-ipe-ink/50">
             Crypto quote may have expired (~20 min validity). If your wallet rejects the amount, contact support — we can regenerate it.
           </p>
+
+          <div className="pt-2 border-t border-ipe-stone-200 dark:border-ipe-navy-500/30">
+            <button
+              type="button"
+              onClick={cancel}
+              disabled={cancelling}
+              className="btn-ghost text-xs w-full"
+            >
+              {cancelling ? 'Cancelling…' : 'Cancel this order'}
+            </button>
+          </div>
         </div>
       </div>
     </div>,
