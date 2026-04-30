@@ -25,7 +25,7 @@ export function InstallPosterModal({ onClose }: { onClose: () => void }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-ipe-cream-50 dark:bg-ipe-navy-800 rounded-xl my-6 w-full max-w-3xl shadow-xl border border-ipe-stone-200 dark:border-ipe-navy-500/40 print:bg-transparent print:my-0 print:max-w-none print:border-0 print:shadow-none print:rounded-none"
+        className="bg-ipe-cream-50 dark:bg-ipe-navy-800 rounded-xl my-6 w-full max-w-5xl shadow-xl border border-ipe-stone-200 dark:border-ipe-navy-500/40 print:bg-transparent print:my-0 print:max-w-none print:border-0 print:shadow-none print:rounded-none"
       >
         <header className="flex items-center justify-between px-5 py-3 border-b border-ipe-stone-200 dark:border-ipe-navy-500/40 print:hidden">
           <h2 className="font-display font-semibold text-ipe-navy-700 dark:text-ipe-cream-100">
@@ -68,9 +68,12 @@ export function InstallPosterModal({ onClose }: { onClose: () => void }) {
           </p>
         </div>
 
-        {/* ── The poster itself — A4 portrait, print-ready ── */}
-        <div className="px-5 pb-6 print:p-0">
-          <div className="poster-page mx-auto bg-ipe-cream-100 text-ipe-navy-700 shadow-md print:shadow-none border border-ipe-stone-200/60 print:border-0 flex flex-col">
+        {/* ── The poster itself — A4 portrait, print-ready.
+             Wrapper allows horizontal scroll on narrow viewports since
+             the poster is exactly 210mm wide (~794px). On print, the
+             visibility trick bypasses the wrapper entirely. ── */}
+        <div className="px-5 pb-6 overflow-x-auto print:p-0 print:overflow-visible">
+          <div className="poster-page mx-auto shadow-md print:shadow-none flex flex-col">
             <div className="px-12 pt-12 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <FlowerMark size={42} className="text-ipe-gold" />
@@ -119,12 +122,38 @@ export function InstallPosterModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        {/* ── Print stylesheet — A4, hide everything except .poster-page ── */}
+        {/* ── Poster styles ──
+             • Always cream bg + navy text, regardless of dark mode (preview
+               must match the printed paper).
+             • Override the global text-ipe-* and --color-ink dark rules with
+               higher specificity so nested elements stay legible.
+             • Print: hide everything except .poster-page and re-anchor it
+               to the page (classic visibility trick). */}
         <style>{`
           .poster-page {
             width: 210mm;
             height: 297mm;
+            background: #eff2f1;
+            color: #001627;
+            border: 1px solid rgba(220, 223, 221, 0.6);
+            border-radius: 0;
           }
+          html.dark .poster-page {
+            --color-ink: 14 14 12;     /* re-flip ink var so text-ipe-ink-* stays dark */
+            background: #eff2f1;
+            color: #001627;
+          }
+          html.dark .poster-page .text-ipe-navy-700,
+          html.dark .poster-page .text-ipe-navy-600,
+          html.dark .poster-page .text-ipe-green-700,
+          html.dark .poster-page .text-ipe-green-600 {
+            color: #001627;
+          }
+          html.dark .poster-page .text-ipe-gold,
+          html.dark .poster-page .text-ipe-gold-600 {
+            color: #ffb600;            /* keep brand gold on the FlowerMark */
+          }
+
           @media print {
             @page { size: A4 portrait; margin: 0; }
             body * { visibility: hidden !important; }
