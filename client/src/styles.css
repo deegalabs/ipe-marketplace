@@ -48,30 +48,48 @@
     color: theme('colors.ipe.green.800');
   }
 
-  /* Brand greens used as primary text/headlines flip to cream in dark mode.
-     Cleaner than peppering dark:text-ipe-cream-100 across every page. */
+  /* Brand navy/green used as primary text/headlines flip to cream in dark
+     mode. Centralized here so we don't pepper dark:text-ipe-cream-100 across
+     every page. Both -green-* (legacy alias) and -navy-* (new) covered. */
+  html.dark .text-ipe-green,
+  html.dark .text-ipe-green-500,
   html.dark .text-ipe-green-600,
-  html.dark .text-ipe-green-700 {
+  html.dark .text-ipe-green-700,
+  html.dark .text-ipe-green-800,
+  html.dark .text-ipe-navy,
+  html.dark .text-ipe-navy-500,
+  html.dark .text-ipe-navy-600,
+  html.dark .text-ipe-navy-700,
+  html.dark .text-ipe-navy-800 {
     color: theme('colors.ipe.cream.100');
+  }
+  /* Hover variants on links (e.g. footer "All products") */
+  html.dark .hover\:text-ipe-green-700:hover,
+  html.dark .hover\:text-ipe-green-600:hover,
+  html.dark .hover\:text-ipe-navy-700:hover,
+  html.dark .hover\:text-ipe-navy-600:hover {
+    color: theme('colors.ipe.gold.DEFAULT');
   }
   html.dark .text-ipe-gold-600 {
     color: theme('colors.ipe.gold.DEFAULT');
   }
   html.dark .border-ipe-stone-200,
-  html.dark .border-ipe-stone-200\/60 {
-    border-color: theme('colors.ipe.green.500' / 30%);
+  html.dark .border-ipe-stone-200\/60,
+  html.dark .border-ipe-stone-200\/40 {
+    border-color: rgb(0 30 52 / 0.5);     /* navy-700 @ 0.5 */
   }
   html.dark .bg-white,
   html.dark .bg-white\/95,
   html.dark .bg-white\/60 {
-    background-color: rgb(10 58 47 / 0.4);   /* ipe-green-600 @ 0.4 */
+    background-color: rgb(0 30 52 / 0.5);   /* navy-700 @ 0.5 */
   }
-  html.dark .bg-ipe-green-100 {
-    background-color: rgb(10 58 47 / 0.5);
+  html.dark .bg-ipe-green-100,
+  html.dark .bg-ipe-navy-100 {
+    background-color: rgb(0 30 52 / 0.4);
   }
   html.dark .bg-ipe-stone-100,
   html.dark .bg-ipe-stone-50 {
-    background-color: rgb(10 58 47 / 0.25);
+    background-color: rgb(0 30 52 / 0.25);
   }
 
   ::selection {
