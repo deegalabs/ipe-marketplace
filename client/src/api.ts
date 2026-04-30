@@ -90,7 +90,7 @@ export interface OrderDTO {
   status: 'pending' | 'awaiting_payment' | 'paid' | 'shipped' | 'delivered' | 'refunded' | 'cancelled';
   deliveryMethod: DeliveryMethod;
   shippingAddress: unknown;
-  pickup: { eventId: string; displayName: string } | null;
+  pickup: { eventId: string; displayName?: string } | null;
   trackingCode: string | null;
   createdAt: string;
 }
@@ -141,7 +141,7 @@ export const api = {
     payCurrency?: string;
     deliveryMethod: 'shipping' | 'pickup';
     shippingAddress?: unknown;
-    pickup?: { eventId: string; displayName: string };
+    pickup?: { eventId: string };
   }) =>
     request<{
       orderId: string;

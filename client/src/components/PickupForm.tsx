@@ -2,7 +2,6 @@ import { useState } from 'react';
 
 export interface PickupFormValues {
   eventId: string;
-  displayName: string;
 }
 
 interface Props {
@@ -12,13 +11,13 @@ interface Props {
 
 export function PickupForm({ value, onChange }: Props) {
   const [draft, setDraft] = useState<PickupFormValues>(
-    value ?? { eventId: 'ipe-meetup-2026-05', displayName: '' },
+    value ?? { eventId: 'ipe-meetup-2026-05' },
   );
 
   const update = (patch: Partial<PickupFormValues>) => {
     const next = { ...draft, ...patch };
     setDraft(next);
-    if (next.eventId && next.displayName) onChange(next);
+    if (next.eventId) onChange(next);
   };
 
   return (
@@ -35,17 +34,8 @@ export function PickupForm({ value, onChange }: Props) {
           The admin sets the active event ID. Default works for the next meetup.
         </p>
       </div>
-      <div>
-        <label className="label">Your name (for verification at pickup)</label>
-        <input
-          className="input"
-          value={draft.displayName}
-          onChange={(e) => update({ displayName: e.target.value })}
-          placeholder="As shown on your ID / badge"
-        />
-      </div>
       <p className="text-xs text-ipe-ink/60">
-        Show your wallet (the 1155 receipt) and ID at the event to collect.
+        Show the order in My orders (or the 1155 receipt on your wallet) at the event to collect.
       </p>
     </fieldset>
   );

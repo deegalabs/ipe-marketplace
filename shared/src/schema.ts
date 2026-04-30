@@ -89,8 +89,10 @@ export type ShippingAddress = z.infer<typeof shippingAddressSchema>;
 export const pickupInfoSchema = z.object({
   /// Free-form event identifier set by the admin per-product (e.g. "ipe-meetup-2026-05").
   eventId: z.string().max(120),
-  /// Buyer-supplied display name for verification at pickup.
-  displayName: z.string().min(1).max(120),
+  /// Optional display name. Kept on the schema for backwards compat with
+  /// pre-existing orders, but no longer collected at checkout — buyer is
+  /// already identified via Privy (email or wallet) and the order ID.
+  displayName: z.string().max(120).optional(),
 });
 export type PickupInfo = z.infer<typeof pickupInfoSchema>;
 

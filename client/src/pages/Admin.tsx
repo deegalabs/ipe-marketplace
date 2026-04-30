@@ -525,7 +525,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                     {o.deliveryMethod === 'shipping' && addr
                       ? `→ ${addr.line1}, ${addr.city} (${addr.country})`
                       : o.deliveryMethod === 'pickup' && o.pickup
-                        ? `pickup @ ${o.pickup.eventId} (${o.pickup.displayName})`
+                        ? `pickup @ ${o.pickup.eventId}${o.pickup.displayName ? ` (${o.pickup.displayName})` : ''}`
                         : '—'}
                   </p>
                   <div className="mt-2">
@@ -574,7 +574,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                         {o.deliveryMethod === 'shipping' && addr
                           ? `→ ${addr.line1}, ${addr.city} (${addr.country})`
                           : o.deliveryMethod === 'pickup' && o.pickup
-                            ? `pickup @ ${o.pickup.eventId} (${o.pickup.displayName})`
+                            ? `pickup @ ${o.pickup.eventId}${o.pickup.displayName ? ` (${o.pickup.displayName})` : ''}`
                             : '—'}
                       </td>
                       <td>{o.status}</td>
