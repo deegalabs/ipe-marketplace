@@ -37,19 +37,27 @@ export function Shop() {
 function Hero({ count }: { count?: number }) {
   return (
     <section className="relative">
-      {/* Subtle gold accent — only on the upper-right of the hero */}
+      {/* Brand blob accents — blue/lime/yellow per Brand Guide §17 */}
       <div
         aria-hidden
-        className="absolute -top-12 right-0 w-72 h-72 rounded-full bg-ipe-gold/10 blur-3xl pointer-events-none"
+        className="absolute -top-20 right-0 w-96 h-96 rounded-full bg-ipe-sky/15 dark:bg-ipe-sky/20 blur-3xl pointer-events-none"
+      />
+      <div
+        aria-hidden
+        className="absolute top-10 right-32 w-72 h-72 rounded-full bg-ipe-lime/15 dark:bg-ipe-lime/20 blur-3xl pointer-events-none"
+      />
+      <div
+        aria-hidden
+        className="absolute -top-8 right-64 w-48 h-48 rounded-full bg-ipe-yellow/15 dark:bg-ipe-yellow/15 blur-3xl pointer-events-none"
       />
       <div className="relative max-w-3xl space-y-5">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ipe-gold/15 border border-ipe-gold/30">
-          <span className="w-1.5 h-1.5 rounded-full bg-ipe-gold animate-pulse-subtle" />
-          <span className="text-2xs font-semibold uppercase tracking-widest text-ipe-gold-600 dark:text-ipe-gold">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ipe-lime/15 border border-ipe-lime/40">
+          <span className="w-1.5 h-1.5 rounded-full bg-ipe-lime animate-pulse-subtle" />
+          <span className="text-2xs font-semibold uppercase tracking-widest text-ipe-navy-600 dark:text-ipe-lime">
             Limited drop · Onchain receipts
           </span>
         </div>
-        <h1 className="text-hero sm:text-display font-display text-ipe-green-700 leading-[0.95]">
+        <h1 className="text-hero sm:text-display font-display text-ipe-navy-600 dark:text-ipe-cream-100 leading-[0.95]">
           Wear the city.<br />
           <span className="text-ipe-ink-70 font-medium">Carry the chain.</span>
         </h1>
@@ -58,7 +66,7 @@ function Hero({ count }: { count?: number }) {
           shipped from the next event.
         </p>
         {count !== undefined && (
-          <div className="flex items-center gap-4 pt-2 text-2xs uppercase tracking-widest text-ipe-ink-50">
+          <div className="flex items-center gap-4 pt-2 text-2xs font-display uppercase tracking-widest text-ipe-ink-50">
             <span>{count} pieces available</span>
             <span className="w-1 h-1 rounded-full bg-ipe-ink-30" />
             <span>USD pricing</span>

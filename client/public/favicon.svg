@@ -1,14 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#0a3a2f"/>
-  <g transform="translate(32 32)">
-    <g fill="#f3c969">
-      <ellipse cx="0" cy="-12" rx="7.5" ry="11.5"/>
-      <ellipse cx="0" cy="-12" rx="7.5" ry="11.5" transform="rotate(72)"/>
-      <ellipse cx="0" cy="-12" rx="7.5" ry="11.5" transform="rotate(144)"/>
-      <ellipse cx="0" cy="-12" rx="7.5" ry="11.5" transform="rotate(216)"/>
-      <ellipse cx="0" cy="-12" rx="7.5" ry="11.5" transform="rotate(288)"/>
-    </g>
-    <circle r="5.5" fill="#0a3a2f"/>
-    <circle r="2.8" fill="#f3c969"/>
-  </g>
+  <rect width="64" height="64" rx="14" fill="#002642"/>
+  <path d="M14 44 L32 24 L50 44 L42 44 L32 32 L22 44 Z" fill="#EFF2F1"/>
 </svg>

@@ -1,19 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Background -->
-  <rect width="512" height="512" rx="112" fill="#0a3a2f"/>
+  <!-- Brand gradient backdrop (blue → green → yellow over navy), per Brand Guide §17 -->
+  <defs>
+    <radialGradient id="g1" cx="20%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#3AA5FF" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#3AA5FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="g2" cx="75%" cy="65%" r="55%">
+      <stop offset="0%" stop-color="#A2D729" stop-opacity="0.65"/>
+      <stop offset="100%" stop-color="#A2D729" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="g3" cx="60%" cy="20%" r="40%">
+      <stop offset="0%" stop-color="#FFB600" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#FFB600" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="#002642"/>
+  <rect width="512" height="512" rx="96" fill="url(#g1)"/>
+  <rect width="512" height="512" rx="96" fill="url(#g2)"/>
+  <rect width="512" height="512" rx="96" fill="url(#g3)"/>
 
-  <!-- Ipê flower: 5 petals in radial 72° pattern (gold on green) -->
-  <g transform="translate(256 256)">
-    <!-- petals -->
-    <g fill="#f3c969">
-      <ellipse cx="0" cy="-92" rx="58" ry="90"/>
-      <ellipse cx="0" cy="-92" rx="58" ry="90" transform="rotate(72)"/>
-      <ellipse cx="0" cy="-92" rx="58" ry="90" transform="rotate(144)"/>
-      <ellipse cx="0" cy="-92" rx="58" ry="90" transform="rotate(216)"/>
-      <ellipse cx="0" cy="-92" rx="58" ry="90" transform="rotate(288)"/>
-    </g>
-    <!-- inner ring (negative space carve) -->
-    <circle r="42" fill="#0a3a2f"/>
-    <circle r="22" fill="#f3c969"/>
-  </g>
+  <!-- Official chevron symbol (Brand Guide §07), centered + scaled -->
+  <path
+    d="M104 352 L256 184 L408 352 L344 352 L256 256 L168 352 Z"
+    fill="#EFF2F1"
+  />
 </svg>

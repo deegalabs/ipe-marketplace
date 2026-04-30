@@ -19,25 +19,28 @@
   }
 
   body {
-    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-    font-feature-settings: 'cv11', 'ss03', 'ss01';   /* refined Inter glyphs */
+    /* Brand body font (Brand Guide §14: DM Sans for body/long text). */
+    font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     background:
-      radial-gradient(1200px 600px at 100% -10%, rgba(243, 201, 105, 0.18), transparent 60%),
-      radial-gradient(900px 500px at -10% 100%, rgba(10, 58, 47, 0.06), transparent 60%),
-      theme('colors.ipe.cream.DEFAULT');
+      radial-gradient(1100px 600px at 100% -10%, rgba(255, 182, 0, 0.10), transparent 55%),
+      radial-gradient(900px 500px at -10% 100%, rgba(58, 165, 255, 0.10), transparent 55%),
+      theme('colors.ipe.cream.100');
     color: theme('colors.ipe.ink.DEFAULT');
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
 
   html.dark body {
+    /* In dark mode, the brand's signature blob gradient comes alive — soft
+       blue/lime/yellow over deep navy. Echoes the cover of the Brand Guide. */
     background:
-      radial-gradient(1200px 600px at 100% -10%, rgba(243, 201, 105, 0.10), transparent 60%),
-      radial-gradient(900px 500px at -10% 100%, rgba(10, 58, 47, 0.4), transparent 60%),
-      theme('colors.ipe.green.800');
+      radial-gradient(1000px 700px at 20% 30%, rgba(58, 165, 255, 0.22), transparent 50%),
+      radial-gradient(900px 600px at 80% 60%, rgba(162, 215, 41, 0.18), transparent 50%),
+      radial-gradient(700px 500px at 60% 20%, rgba(255, 182, 0, 0.12), transparent 45%),
+      theme('colors.ipe.navy.700');
     color: theme('colors.ipe.cream.100');
   }
   html.dark ::selection {

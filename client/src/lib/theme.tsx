@@ -22,7 +22,7 @@ function applyToHtml(resolved: 'light' | 'dark') {
   else root.classList.remove('dark');
   // Sync the theme-color meta so the iOS notch / Android status bar match.
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', resolved === 'dark' ? '#041a16' : '#0a3a2f');
+  if (meta) meta.setAttribute('content', resolved === 'dark' ? '#001627' : '#002642');
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

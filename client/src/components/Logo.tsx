@@ -1,6 +1,5 @@
 /// Ipê Store brand mark — uses the official wordmark from /public.
-/// Two PNGs/SVGs are layered: black for light mode, cream/white for dark mode.
-/// Tailwind's dark: variant flips visibility so we don't need JS to detect theme.
+/// Two SVGs are layered: black for light mode, off-white for dark mode.
 
 export function Logo({ className = '', height = 28 }: { className?: string; height?: number }) {
   // Aspect ratio of the source SVG: 1599 / 500 ≈ 3.198
@@ -27,9 +26,11 @@ export function Logo({ className = '', height = 28 }: { className?: string; heig
   );
 }
 
-/// Standalone flower mark — kept for the favicon path / install screens that
-/// can't fit a wordmark. Lifted from the icon-source.svg geometry.
-export function FlowerMark({ className = '', size = 28 }: { className?: string; size?: number }) {
+/// Standalone brand symbol (Brand Guide §07): a stylized chevron / roof
+/// extracted from the "i" of the ipê wordmark — also evokes the diacritic on
+/// "ipê" and a peaked roof. Used for favicons, install icons, and tight
+/// surfaces where the full wordmark won't fit.
+export function ChevronMark({ className = '', size = 28 }: { className?: string; size?: number }) {
   return (
     <svg
       width={size}
@@ -38,17 +39,16 @@ export function FlowerMark({ className = '', size = 28 }: { className?: string; 
       className={className}
       aria-hidden="true"
     >
-      <g transform="translate(32 32)">
-        <g fill="currentColor">
-          <ellipse cx="0" cy="-12" rx="7.5" ry="11.5" />
-          <ellipse cx="0" cy="-12" rx="7.5" ry="11.5" transform="rotate(72)" />
-          <ellipse cx="0" cy="-12" rx="7.5" ry="11.5" transform="rotate(144)" />
-          <ellipse cx="0" cy="-12" rx="7.5" ry="11.5" transform="rotate(216)" />
-          <ellipse cx="0" cy="-12" rx="7.5" ry="11.5" transform="rotate(288)" />
-        </g>
-        <circle r="5.5" className="fill-ipe-cream-100 dark:fill-ipe-green-700" />
-        <circle r="2.8" fill="currentColor" />
-      </g>
+      {/* Path traces the official chevron — two thick rounded strokes meeting at apex.
+          currentColor lets the symbol take on the surrounding text color. */}
+      <path
+        d="M10 44 L32 22 L54 44 L46 44 L32 30 L18 44 Z"
+        fill="currentColor"
+      />
     </svg>
   );
 }
+
+/// Backwards-compat: components that imported FlowerMark continue to work,
+/// now rendering the official chevron mark.
+export const FlowerMark = ChevronMark;
