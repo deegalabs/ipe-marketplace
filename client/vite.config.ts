@@ -31,6 +31,17 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webp,woff2}'],
         // Privy/wagmi bundle is ~2.2 MB minified — bump the cache limit so it gets precached.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        // Activate new SW immediately and take control of open tabs without
+        // waiting for them to close. Combined with `registerType: 'autoUpdate'`,
+        // the page auto-reloads to pick up the new bundle on the next user
+        // interaction — updates land within seconds of opening the app.
+        // (Note: home-screen icons are owned by the OS, so ICON updates still
+        // require uninstall+reinstall of the PWA.)
+        skipWaiting: true,
+        clientsClaim: true,
+        // Older precaches accumulate in storage when SW versions roll over —
+        // wipe them so the user doesn't end up with stale assets.
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
             // Cache the API catalog response so the shop loads while offline.
