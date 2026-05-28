@@ -32,7 +32,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       config={{
         defaultChain: baseSepolia,
         supportedChains: [baseSepolia],
-        loginMethods: ['email', 'wallet'],
+        loginMethods: ['email', 'google', 'wallet'],
         embeddedWallets: { ethereum: { createOnLogin: 'users-without-wallets' } },
       }}
     >
