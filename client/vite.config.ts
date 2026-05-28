@@ -79,12 +79,13 @@ export default defineConfig({
     // ~2 MB of the original bundle — most pages don't need them up front.
     rollupOptions: {
       output: {
+        // Only split out the heavy 3rd-party stacks. React, wouter, and
+        // react-query stay in the main bundle to avoid load-order issues
+        // (Privy + wagmi internally import React; splitting React out can
+        // race the vendor chunk and crash the app at boot).
         manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'wouter'],
-          'react-query': ['@tanstack/react-query'],
           'privy': ['@privy-io/react-auth', '@privy-io/wagmi'],
           'wagmi-viem': ['wagmi', 'viem'],
-          'qrcode': ['qrcode.react'],
         },
       },
     },
