@@ -81,6 +81,26 @@ export async function getPayment(paymentId: string) {
   };
 }
 
+/// Refund a payment (total or partial). Omit `amount` for a full refund.
+/// MP returns 201 with the refund object; 400 if already refunded.
+export async function refundPayment(paymentId: string, amount?: number) {
+  if (!features.mercadopago) throw new MercadoPagoUnavailable();
+  const res = await fetch(`${MP_BASE}/v1/payments/${paymentId}/refunds`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.MERCADOPAGO_ACCESS_TOKEN}`,
+      'Content-Type': 'application/json',
+      'X-Idempotency-Key': `refund-${paymentId}`,
+    },
+    body: JSON.stringify(amount != null ? { amount } : {}),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Mercado Pago refundPayment failed: ${res.status} ${text}`);
+  }
+  return (await res.json()) as { id: number; payment_id: number; amount: number; status: string };
+}
+
 /// Verifies the v2 webhook signature header. Mercado Pago signs with
 /// `ts=<unix>,v1=<hmac-sha256(secret, "id:<paymentId>;request-id:<x-request-id>;ts:<ts>;")>`.
 /// Returns true if the signature is valid (or if no secret configured — dev mode).

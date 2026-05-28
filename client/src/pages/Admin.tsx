@@ -483,6 +483,7 @@ function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormP
 function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; products: ProductDTO[]; loading: boolean }) {
   const qc = useQueryClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const productById = new Map(products.map((p) => [p.id, p] as const));
 
   async function setStatus(id: string, status: string) {
@@ -494,6 +495,30 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
       toast.error('Update failed', err instanceof Error ? err.message : String(err));
     }
   }
+
+  async function refund(o: OrderDTO) {
+    const isPix = o.paymentProvider === 'mercadopago';
+    const ok = await confirm({
+      title: 'Refund this order?',
+      body: isPix
+        ? 'This will call Mercado Pago to refund the PIX payment and mark the order as refunded.'
+        : 'Crypto refunds are irreversible and must be sent manually from treasury. This will only flip the order status to refunded.',
+      confirmLabel: 'Refund',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await api.refundOrder(o.id);
+      await qc.invalidateQueries({ queryKey: ['admin-orders'] });
+      toast.success('Order refunded', isPix ? 'Mercado Pago refund requested' : 'Status set to refunded — send manual refund');
+    } catch (err) {
+      toast.error('Refund failed', err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  const canRefund = (o: OrderDTO) =>
+    (o.status === 'paid' || o.status === 'shipped' || o.status === 'delivered') &&
+    (o.paymentProvider === 'mercadopago' || o.paymentProvider === 'nowpayments');
 
   return (
     <div className="card p-5">
@@ -528,7 +553,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                         ? `pickup @ ${o.pickup.eventId}${o.pickup.displayName ? ` (${o.pickup.displayName})` : ''}`
                         : '—'}
                   </p>
-                  <div className="mt-2">
+                  <div className="mt-2 flex flex-wrap gap-2">
                     {o.status === 'paid' && (
                       <button className="action-btn-ghost" onClick={() => setStatus(o.id, 'shipped')}>
                         <TruckIcon /> {o.deliveryMethod === 'pickup' ? 'Mark delivered' : 'Mark shipped'}
@@ -537,6 +562,11 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                     {o.status === 'shipped' && (
                       <button className="action-btn-ghost" onClick={() => setStatus(o.id, 'delivered')}>
                         <PackageCheckIcon /> Mark delivered
+                      </button>
+                    )}
+                    {canRefund(o) && (
+                      <button className="action-btn-destructive" onClick={() => refund(o)}>
+                        <RefreshIcon /> Refund
                       </button>
                     )}
                   </div>
@@ -579,16 +609,23 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                       </td>
                       <td>{o.status}</td>
                       <td>
-                        {o.status === 'paid' && (
-                          <button className="btn-ghost text-xs" onClick={() => setStatus(o.id, 'shipped')}>
-                            {o.deliveryMethod === 'pickup' ? 'Mark delivered' : 'Mark shipped'}
-                          </button>
-                        )}
-                        {o.status === 'shipped' && (
-                          <button className="btn-ghost text-xs" onClick={() => setStatus(o.id, 'delivered')}>
-                            Mark delivered
-                          </button>
-                        )}
+                        <div className="flex flex-wrap gap-1">
+                          {o.status === 'paid' && (
+                            <button className="btn-ghost text-xs" onClick={() => setStatus(o.id, 'shipped')}>
+                              {o.deliveryMethod === 'pickup' ? 'Mark delivered' : 'Mark shipped'}
+                            </button>
+                          )}
+                          {o.status === 'shipped' && (
+                            <button className="btn-ghost text-xs" onClick={() => setStatus(o.id, 'delivered')}>
+                              Mark delivered
+                            </button>
+                          )}
+                          {canRefund(o) && (
+                            <button className="btn-ghost text-xs text-red-600" onClick={() => refund(o)}>
+                              Refund
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

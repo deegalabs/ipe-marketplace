@@ -127,6 +127,10 @@ export const api = {
   adminOrders: () => request<OrderDTO[]>('/orders/admin', { admin: true }),
   updateOrder: (id: string, body: { status?: string; trackingCode?: string }) =>
     request<OrderDTO>(`/orders/admin/${id}`, { admin: true, method: 'PATCH', body: JSON.stringify(body) }),
+  /// Admin refund. For PIX, calls the Mercado Pago refund API. For crypto and
+  /// direct orders, just flips status to 'refunded' (refund must be sent manually).
+  refundOrder: (id: string) =>
+    request<OrderDTO>(`/orders/admin/${id}/refund`, { admin: true, method: 'POST' }),
 
   /// Gateway checkout (Mercado Pago PIX or NOWPayments crypto-gateway).
   createGatewayOrder: (input: {

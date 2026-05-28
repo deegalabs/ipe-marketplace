@@ -238,13 +238,20 @@ gatewayRouter.post('/webhooks/mercadopago', async (req, res) => {
 
   try {
     const payment = await getPayment(paymentId);
-    if (payment.status !== 'approved') {
-      console.log(`[mercadopago] payment ${paymentId} status=${payment.status} — ignoring`);
-      return res.status(200).send();
-    }
     if (!payment.external_reference) return res.status(200).send();
 
-    await markPaidAndMint(payment.external_reference);
+    if (payment.status === 'approved') {
+      await markPaidAndMint(payment.external_reference);
+    } else if (payment.status === 'refunded' || payment.status === 'charged_back') {
+      // Mirror gateway state — refund may have been initiated from MP dashboard
+      // (bypassing our admin endpoint), so we sync here as well.
+      await db
+        .update(schema.orders)
+        .set({ status: 'refunded', updatedAt: new Date() })
+        .where(eq(schema.orders.id, payment.external_reference));
+    } else {
+      console.log(`[mercadopago] payment ${paymentId} status=${payment.status} — ignoring`);
+    }
     return res.status(200).send();
   } catch (err) {
     console.error('[mercadopago] webhook handler failed', err);

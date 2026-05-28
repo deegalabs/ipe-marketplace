@@ -11,6 +11,7 @@ import {
   sendOrderDelivered,
 } from '../services/email.js';
 import { requireAdmin } from '../middleware/requireAdmin.js';
+import { refundPayment } from '../services/mercadopago.js';
 
 export const ordersRouter = Router();
 
@@ -90,6 +91,35 @@ ordersRouter.patch('/admin/:id', requireAdmin, async (req, res) => {
   }
 
   res.json(serializeOrder(row, true));
+});
+
+/// Admin refund. For PIX (Mercado Pago) we call the gateway's refund API;
+/// the webhook will land later with status='refunded' but we flip the order
+/// immediately so the admin UI reflects the decision. For crypto we only
+/// flip status — refunds are irreversible and must be sent manually from
+/// treasury. For direct (onchain) orders refund is also manual.
+ordersRouter.post('/admin/:id/refund', requireAdmin, async (req, res) => {
+  const row = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
+  if (!row) return res.status(404).json({ error: 'order not found' });
+  if (row.status !== 'paid' && row.status !== 'shipped' && row.status !== 'delivered') {
+    return res.status(409).json({ error: `cannot refund order with status '${row.status}'` });
+  }
+
+  if (row.paymentProvider === 'mercadopago') {
+    if (!row.paymentRef) return res.status(409).json({ error: 'order has no payment reference' });
+    try {
+      await refundPayment(row.paymentRef);
+    } catch (err) {
+      return res.status(502).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  const [updated] = await db
+    .update(schema.orders)
+    .set({ status: 'refunded', updatedAt: new Date() })
+    .where(eq(schema.orders.id, req.params.id))
+    .returning();
+  res.json(serializeOrder(updated!, true));
 });
 
 /// Public cancel — buyer initiated. Idempotent + race-safe: the UPDATE only
