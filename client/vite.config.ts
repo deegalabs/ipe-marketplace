@@ -73,4 +73,21 @@ export default defineConfig({
     }),
   ],
   server: { port: 5173 },
+  build: {
+    // Split the heavy auth/wallet stacks into their own chunks so the initial
+    // bundle only carries the storefront shell. Privy + wagmi + viem alone are
+    // ~2 MB of the original bundle — most pages don't need them up front.
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'wouter'],
+          'react-query': ['@tanstack/react-query'],
+          'privy': ['@privy-io/react-auth', '@privy-io/wagmi'],
+          'wagmi-viem': ['wagmi', 'viem'],
+          'qrcode': ['qrcode.react'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 800,
+  },
 });
