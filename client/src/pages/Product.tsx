@@ -174,7 +174,7 @@ export function ProductPage() {
               {priceDisplay(p)}
             </p>
             {soldOut && (
-              <span className="px-2.5 py-1 bg-ipe-ink text-ipe-cream text-2xs font-display font-bold uppercase tracking-widest rounded-sm">
+              <span className="px-2.5 py-1 bg-ipe-navy-800 text-ipe-cream-100 text-2xs font-display font-bold uppercase tracking-widest rounded-sm">
                 Sold out
               </span>
             )}

@@ -105,7 +105,7 @@ function ProductCard({ product, index }: { product: ProductDTO; index: number })
           className={`w-full h-full object-cover transition-transform duration-500 ease-smooth group-hover:scale-110 ${soldOut ? 'grayscale opacity-60' : ''}`}
         />
         {soldOut && (
-          <div className="absolute top-3 left-3 z-10 px-2.5 py-1 bg-ipe-ink text-ipe-cream text-2xs font-display font-bold uppercase tracking-widest rounded-sm shadow-md">
+          <div className="absolute top-3 left-3 z-10 px-2.5 py-1 bg-ipe-navy-800 text-ipe-cream-100 text-2xs font-display font-bold uppercase tracking-widest rounded-sm shadow-md">
             Sold out
           </div>
         )}
