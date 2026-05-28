@@ -65,10 +65,11 @@ export function ProductPage() {
 
   const deliveryReady = delivery === 'shipping' ? !!shipping : !!pickup;
   const isGateway = paymentMethod === 'gateway';
+  const soldOut = p.physicalStock === 0;
   // Gateway flow doesn't require wallet/onchain product — only delivery info.
-  const canSubmit = isGateway
+  const canSubmit = !soldOut && (isGateway
     ? deliveryReady
-    : !!address && tokenId !== null && deliveryReady && enabledMethods.includes(paymentMethod);
+    : !!address && tokenId !== null && deliveryReady && enabledMethods.includes(paymentMethod));
 
   async function buyCrypto(method: CryptoToken) {
     if (!address || !tokenId || !publicClient) return;
@@ -147,6 +148,7 @@ export function ProductPage() {
       case 'buying': return 'Submitting purchase…';
       case 'recording': return 'Recording order…';
       default:
+        if (soldOut) return 'Sold out';
         if (paymentMethod === 'ipe') return `Buy for ${formatToken(p.priceIpe, 'IPE')}`;
         if (paymentMethod === 'usdc') return `Buy for ${formatToken(p.priceUsdc, 'USDC')}`;
         if (!authenticated) return 'Sign in to checkout';
@@ -167,9 +169,16 @@ export function ProductPage() {
           <h1 className="text-3xl sm:text-4xl font-display font-bold text-ipe-green-700 tracking-tight leading-tight">
             {p.name}
           </h1>
-          <p className="text-2xl mt-3 font-mono tabular-nums text-ipe-ink">
-            {priceDisplay(p)}
-          </p>
+          <div className="flex items-center gap-3 mt-3">
+            <p className="text-2xl font-mono tabular-nums text-ipe-ink">
+              {priceDisplay(p)}
+            </p>
+            {soldOut && (
+              <span className="px-2.5 py-1 bg-ipe-ink text-ipe-cream text-2xs font-display font-bold uppercase tracking-widest rounded-sm">
+                Sold out
+              </span>
+            )}
+          </div>
           <p className="text-ipe-ink-70 mt-5 text-sm sm:text-base leading-relaxed max-w-prose">
             {p.description}
           </p>

@@ -91,6 +91,7 @@ function ProductGrid({ items }: { items: ProductDTO[] }) {
 }
 
 function ProductCard({ product, index }: { product: ProductDTO; index: number }) {
+  const soldOut = product.physicalStock === 0;
   return (
     <Link
       href={`/product/${product.id}`}
@@ -101,8 +102,13 @@ function ProductCard({ product, index }: { product: ProductDTO; index: number })
         <ProductImage
           src={product.imageUrl}
           alt={product.name}
-          className="w-full h-full object-cover transition-transform duration-500 ease-smooth group-hover:scale-110"
+          className={`w-full h-full object-cover transition-transform duration-500 ease-smooth group-hover:scale-110 ${soldOut ? 'grayscale opacity-60' : ''}`}
         />
+        {soldOut && (
+          <div className="absolute top-3 left-3 z-10 px-2.5 py-1 bg-ipe-ink text-ipe-cream text-2xs font-display font-bold uppercase tracking-widest rounded-sm shadow-md">
+            Sold out
+          </div>
+        )}
         {/* Soft top-bottom gradient for label readability + premium feel */}
         <div
           aria-hidden

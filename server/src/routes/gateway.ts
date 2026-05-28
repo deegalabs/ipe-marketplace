@@ -34,6 +34,11 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
     where: eq(schema.products.id, parsed.data.productId),
   });
   if (!product) return res.status(404).json({ error: 'product not found' });
+  if (!product.active) return res.status(409).json({ error: 'product is not available' });
+  if (product.physicalStock === 0) return res.status(409).json({ error: 'sold out' });
+  if (product.physicalStock < parsed.data.quantity) {
+    return res.status(409).json({ error: `only ${product.physicalStock} left in stock` });
+  }
 
   if (parsed.data.paymentMethod === 'pix' && !features.mercadopago) {
     return res.status(503).json({ error: 'PIX payment is not configured on this server' });
