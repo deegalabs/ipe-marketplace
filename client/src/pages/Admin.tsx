@@ -1195,57 +1195,157 @@ function EventForm({
 // ─── Image URL field ──────────────────────────────────────────────────────
 
 function ImageUrlField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const toast = useToast();
+  const [uploading, setUploading] = useState(false);
+  const [mode, setMode] = useState<'upload' | 'url'>(() => (value && /^https?:\/\//.test(value) ? 'url' : 'upload'));
+
   const resolved = value ? normalizeImageUrl(value, 256) : '';
   const isDrive = resolved !== value.trim() && !!value;
+
+  async function handleFile(file: File) {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Invalid file', 'Only image files are allowed.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File too large', 'Max 5 MB.');
+      return;
+    }
+    setUploading(true);
+    try {
+      const { url } = await api.uploadProductImage(file);
+      onChange(url);
+      toast.success('Image uploaded', file.name);
+    } catch (err) {
+      toast.error('Upload failed', err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
-    <div className="flex gap-3">
-      <div className="flex-1 space-y-1">
-        <input
-          className="input"
-          placeholder="Optional — paste an image URL or Drive share link"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
-        <p className="text-[11px] text-ipe-ink-50">
-          Leave blank to use a brand-tinted placeholder with the product name.
-        </p>
-        {isDrive && (
-          <details className="text-[11px]">
-            <summary className="text-ipe-navy-600 dark:text-ipe-lime cursor-pointer">
-              Drive link detected — how to make it public
-            </summary>
-            <div className="mt-1.5 space-y-1 text-ipe-ink-70">
-              <p>
-                We auto-rewrite Drive share URLs to a thumbnail endpoint. To make it visible to
-                buyers, the file must be shared publicly:
-              </p>
-              <ol className="list-decimal list-inside space-y-0.5 pl-1">
-                <li>Open the file in Google Drive</li>
-                <li>Click <strong>Share</strong> (top-right)</li>
-                <li>Under <strong>General access</strong>, change to <strong>"Anyone with the link"</strong></li>
-                <li>Permission: <strong>Viewer</strong> · click Done</li>
-              </ol>
-              <p className="text-ipe-ink-50 truncate" title={resolved}>
-                Resolves to: <code className="font-mono">{resolved}</code>
-              </p>
-            </div>
-          </details>
-        )}
+    <div className="space-y-2">
+      <div className="flex gap-3">
+        <div className="flex-1 space-y-2">
+          {/* Mode tabs */}
+          <div className="inline-flex gap-1 text-xs rounded-md p-0.5 bg-ipe-stone-100 dark:bg-ipe-navy-700/40">
+            <button
+              type="button"
+              onClick={() => setMode('upload')}
+              className={`px-2.5 py-1 rounded transition-colors ${mode === 'upload' ? 'bg-white dark:bg-ipe-navy-800 shadow-sm font-medium' : 'text-ipe-ink/60'}`}
+            >
+              Upload
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('url')}
+              className={`px-2.5 py-1 rounded transition-colors ${mode === 'url' ? 'bg-white dark:bg-ipe-navy-800 shadow-sm font-medium' : 'text-ipe-ink/60'}`}
+            >
+              Paste URL
+            </button>
+          </div>
+
+          {mode === 'upload' ? (
+            <ImageDropzone uploading={uploading} hasImage={!!resolved} onFile={handleFile} onClear={() => onChange('')} />
+          ) : (
+            <input
+              className="input"
+              placeholder="https://… or a Drive share link"
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+            />
+          )}
+
+          <p className="text-[11px] text-ipe-ink-50">
+            Leave blank to use a brand-tinted placeholder with the product name.
+          </p>
+
+          {mode === 'url' && isDrive && (
+            <details className="text-[11px]">
+              <summary className="text-ipe-navy-600 dark:text-ipe-lime cursor-pointer">
+                Drive link detected — how to make it public
+              </summary>
+              <div className="mt-1.5 space-y-1 text-ipe-ink-70">
+                <p>We auto-rewrite Drive share URLs to a thumbnail endpoint. To make it visible to buyers, the file must be shared publicly:</p>
+                <ol className="list-decimal list-inside space-y-0.5 pl-1">
+                  <li>Open the file in Google Drive</li>
+                  <li>Click <strong>Share</strong> (top-right)</li>
+                  <li>Under <strong>General access</strong>, change to <strong>"Anyone with the link"</strong></li>
+                  <li>Permission: <strong>Viewer</strong> · click Done</li>
+                </ol>
+              </div>
+            </details>
+          )}
+        </div>
+
+        <div className="w-20 h-20 rounded border border-ipe-stone-200 dark:border-ipe-navy-500/30 bg-ipe-stone-50 dark:bg-ipe-navy-700/30 overflow-hidden flex items-center justify-center text-[10px] text-ipe-ink-50 shrink-0">
+          {resolved ? (
+            <img
+              src={resolved}
+              alt="preview"
+              className="w-full h-full object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            'preview'
+          )}
+        </div>
       </div>
-      <div className="w-20 h-20 rounded border border-ipe-stone-200 dark:border-ipe-navy-500/30 bg-ipe-stone-50 dark:bg-ipe-navy-700/30 overflow-hidden flex items-center justify-center text-[10px] text-ipe-ink-50 shrink-0">
-        {resolved ? (
-          <img
-            src={resolved}
-            alt="preview"
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
-          />
-        ) : (
-          'preview'
-        )}
-      </div>
+    </div>
+  );
+}
+
+function ImageDropzone({ uploading, hasImage, onFile, onClear }: {
+  uploading: boolean;
+  hasImage: boolean;
+  onFile: (f: File) => void;
+  onClear: () => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragging(false);
+        const file = e.dataTransfer.files[0];
+        if (file) onFile(file);
+      }}
+      className={`relative flex flex-col items-center justify-center text-center px-3 py-5 rounded-md border-2 border-dashed transition-colors ${
+        dragging
+          ? 'border-ipe-gold bg-ipe-gold/5'
+          : 'border-ipe-stone-300 dark:border-ipe-navy-500/40 hover:border-ipe-navy-400 dark:hover:border-ipe-gold/40'
+      }`}
+    >
+      {uploading ? (
+        <p className="text-sm text-ipe-ink/70 flex items-center gap-2"><SpinnerIcon /> Uploading…</p>
+      ) : (
+        <>
+          <p className="text-sm font-medium text-ipe-ink">
+            {hasImage ? 'Replace image' : 'Drop image here'}
+          </p>
+          <p className="text-[11px] text-ipe-ink-50 mt-0.5">PNG, JPG, WebP or GIF · max 5 MB</p>
+          <label className="mt-2 inline-flex items-center px-3 py-1.5 text-xs rounded-md bg-ipe-navy-700 text-ipe-cream-100 cursor-pointer hover:bg-ipe-navy-600 transition-colors">
+            Choose file
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="sr-only"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onFile(f);
+                e.target.value = '';
+              }}
+            />
+          </label>
+          {hasImage && (
+            <button type="button" onClick={onClear} className="mt-2 text-[11px] text-ipe-ink-50 underline hover:text-ipe-ink">
+              Remove image
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 }

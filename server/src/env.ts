@@ -53,6 +53,15 @@ const envSchema = z.object({
   /// Where admin-alert emails go. Empty = skip admin emails.
   ADMIN_NOTIFICATION_EMAIL: z.string().default(''),
 
+  /// Supabase Storage (product images). Service-role key is admin-only and
+  /// stays server-side — it can write to any bucket. Leave both empty to
+  /// disable uploads; the admin form will fall back to "paste URL only".
+  SUPABASE_URL: z.string().default(''),
+  SUPABASE_SERVICE_KEY: z.string().default(''),
+  /// Bucket name on Supabase Storage. Must be public-read for the storefront
+  /// to render product images without signed URLs.
+  SUPABASE_PRODUCTS_BUCKET: z.string().default('products'),
+
   /// Privy server credentials — used to verify access tokens issued by the
   /// Privy widget on the client. PRIVY_APP_ID must match VITE_PRIVY_APP_ID.
   /// PRIVY_APP_SECRET is in the Privy dashboard → Settings → API keys.
@@ -108,4 +117,5 @@ export const features = {
   mercadopago: !!env.MERCADOPAGO_ACCESS_TOKEN,
   nowpayments: !!env.NOWPAYMENTS_API_KEY,
   email: !!env.RESEND_API_KEY,
+  uploads: !!env.SUPABASE_URL && !!env.SUPABASE_SERVICE_KEY,
 };

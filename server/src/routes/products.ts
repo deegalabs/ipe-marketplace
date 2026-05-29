@@ -1,11 +1,45 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { eq } from 'drizzle-orm';
 import { productInputSchema } from '@ipe/shared';
 import { db, schema } from '../db/client.js';
 import { normalizeImageUrl } from '../lib/imageUrl.js';
 import { requireAdmin } from '../middleware/requireAdmin.js';
+import { uploadProductImage, StorageUnavailable } from '../services/storage.js';
+import { features } from '../env.js';
 
 export const productsRouter = Router();
+
+/// 5 MB cap — product images don't need to be giant, and we don't want admins
+/// blowing the Supabase storage quota by accident. Memory storage is fine
+/// because we forward straight to Supabase without touching disk.
+const uploadMw = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+/// POST /products/upload-image (admin, multipart). Returns { url } that the
+/// admin form then writes into the product's imageUrl on save.
+productsRouter.post('/upload-image', requireAdmin, uploadMw.single('file'), async (req, res) => {
+  if (!features.uploads) {
+    return res.status(503).json({ error: 'image upload is not configured (Supabase env missing)' });
+  }
+  if (!req.file) return res.status(400).json({ error: 'no file provided' });
+  try {
+    const { url } = await uploadProductImage({
+      buffer: req.file.buffer,
+      mimeType: req.file.mimetype,
+      originalName: req.file.originalname,
+    });
+    res.json({ url });
+  } catch (err) {
+    if (err instanceof StorageUnavailable) {
+      return res.status(503).json({ error: err.message });
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(400).json({ error: msg });
+  }
+});
 
 productsRouter.get('/', async (_req, res) => {
   const rows = await db.query.products.findMany({ orderBy: (p, { asc }) => asc(p.createdAt) });

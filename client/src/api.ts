@@ -122,6 +122,30 @@ export const api = {
   deleteProduct: (id: string) =>
     request<{ ok: true }>(`/products/${id}`, { admin: true, method: 'DELETE' }),
 
+  /// Upload a product image to Supabase Storage. Returns the public URL the
+  /// admin then stores on the product. Uses a separate code path from `request`
+  /// because we send multipart, not JSON, and skip the Content-Type header so
+  /// the browser sets the multipart boundary correctly.
+  async uploadProductImage(file: File): Promise<{ url: string }> {
+    const fd = new FormData();
+    fd.append('file', file);
+    const headers: Record<string, string> = {};
+    if (privyTokenGetter) {
+      const token = await privyTokenGetter();
+      if (token) headers.Authorization = `Bearer ${token}`;
+    }
+    const res = await fetch(`${env.apiUrl}/products/upload-image`, {
+      method: 'POST',
+      headers,
+      body: fd,
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: unknown };
+      throw new Error(typeof body.error === 'string' ? body.error : `${res.status} ${res.statusText}`);
+    }
+    return res.json() as Promise<{ url: string }>;
+  },
+
   createOrder: (input: CreateOrderInput) =>
     request<OrderDTO>('/orders', { method: 'POST', body: JSON.stringify(input, replacer) }),
   ordersByBuyer: (address: string) =>
