@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs for the same PR / branch when new commits land —
+# saves CI minutes without dropping the final result.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: shared
+        run: pnpm -F @ipe/shared exec tsc --noEmit
+      - name: client
+        run: pnpm -F @ipe/client exec tsc --noEmit
+      - name: server
+        run: pnpm -F @ipe/server exec tsc --noEmit
+
+  contracts:
+    name: Foundry tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: forge --version
+      - run: forge install
+      - run: forge build --sizes
+      - run: forge test -vvv
+
+  build-client:
+    name: Build client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -F @ipe/shared build
+      - run: pnpm -F @ipe/client build
