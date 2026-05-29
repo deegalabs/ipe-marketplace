@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { Route, Switch, Link, useLocation } from 'wouter';
 import { usePrivy } from '@privy-io/react-auth';
-import { useQuery } from '@tanstack/react-query';
+import { useIsFetching, useQuery } from '@tanstack/react-query';
+import { LoadingState, TopProgressBar } from './components/Skeleton';
 import { Shop } from './pages/Shop';
 import { ProductPage } from './pages/Product';
 import { Orders } from './pages/Orders';
@@ -14,8 +15,13 @@ import { ShopIcon, OrdersIcon } from './components/icons';
 import { api } from './api';
 
 export function App() {
+  // `useIsFetching` counts ALL active react-query fetches. We surface a thin
+  // top-bar so users get feedback during background refetches without a
+  // page-blocking spinner.
+  const fetching = useIsFetching();
   return (
     <div className="min-h-screen flex flex-col">
+      <TopProgressBar active={fetching > 0} />
       <Header />
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 sm:py-10 pb-24 sm:pb-12 motion-in">
         <Switch>
@@ -135,7 +141,7 @@ function AdminGate({ children }: { children?: ReactNode }) {
     retry: false,
   });
 
-  if (!ready) return <p className="text-ipe-ink-50">Loading…</p>;
+  if (!ready) return <LoadingState label="Loading…" />;
 
   if (!authenticated) {
     return (
@@ -149,7 +155,7 @@ function AdminGate({ children }: { children?: ReactNode }) {
     );
   }
 
-  if (meQ.isLoading) return <p className="text-ipe-ink-50">Checking access…</p>;
+  if (meQ.isLoading) return <LoadingState label="Checking access…" />;
 
   if (meQ.isError) {
     const email = user?.email?.address;

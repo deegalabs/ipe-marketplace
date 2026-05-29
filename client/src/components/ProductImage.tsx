@@ -15,6 +15,7 @@ interface Props {
 /// product name centered. Same vibe as the icon-source.svg.
 export function ProductImage({ src, alt, className = '' }: Props) {
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const showFallback = !src || failed;
 
   if (showFallback) {
@@ -38,12 +39,21 @@ export function ProductImage({ src, alt, className = '' }: Props) {
   }
 
   return (
-    <img
-      src={src}
-      alt={alt}
-      onError={() => setFailed(true)}
-      className={className}
-      loading="lazy"
-    />
+    <div className={`relative ${className}`}>
+      {!loaded && (
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-ipe-stone-100 dark:bg-ipe-navy-700/50 animate-pulse-subtle"
+        />
+      )}
+      <img
+        src={src}
+        alt={alt}
+        onError={() => setFailed(true)}
+        onLoad={() => setLoaded(true)}
+        className={`w-full h-full ${className.includes('object-') ? '' : 'object-cover'} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        loading="lazy"
+      />
+    </div>
   );
 }

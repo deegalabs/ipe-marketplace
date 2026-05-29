@@ -179,12 +179,17 @@ export default {
           '0%': { opacity: '0', transform: 'translateX(24px) scale(0.96)' },
           '100%': { opacity: '1', transform: 'translateX(0) scale(1)' },
         },
+        'progress-slide': {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' },
+        },
       },
       animation: {
         'fade-up': 'fade-up 350ms cubic-bezier(0.32, 0.72, 0.24, 1) both',
         'pulse-subtle': 'pulse-subtle 2s ease-in-out infinite',
         'gradient-shift': 'gradient-shift 12s ease-in-out infinite',
         'toast-slide': 'toast-slide 350ms cubic-bezier(0.32, 0.72, 0.24, 1) both',
+        'progress-slide': 'progress-slide 1.4s ease-in-out infinite',
       },
     },
   },

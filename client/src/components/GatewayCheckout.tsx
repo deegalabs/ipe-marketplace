@@ -333,7 +333,16 @@ function CoinPicker({ coins, loading, errored, submitting, usdAmount, onPick }: 
         Total: <strong>~${usdAmount.toFixed(2)} USD</strong> — equivalent in the coin you pick, locked at fill time.
       </p>
 
-      {loading && <p className="text-sm text-ipe-ink/60">Loading available coins…</p>}
+      {loading && (
+        <div className="grid grid-cols-2 gap-2" aria-label="Loading available coins">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="p-3 rounded-md border border-ipe-stone-200 dark:border-ipe-navy-500/30 animate-pulse-subtle space-y-1.5">
+              <div className="h-3.5 w-12 bg-ipe-stone-100 dark:bg-ipe-navy-700/50 rounded" />
+              <div className="h-3 w-20 bg-ipe-stone-100 dark:bg-ipe-navy-700/50 rounded" />
+            </div>
+          ))}
+        </div>
+      )}
       {errored && <p className="text-sm text-red-700">Could not load coins. Try again in a moment.</p>}
       {!loading && !errored && coins.length === 0 && (
         <p className="text-sm text-ipe-ink/60">No coins are currently enabled. Contact support.</p>
