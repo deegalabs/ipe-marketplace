@@ -43,17 +43,19 @@ export function Modal({ title, onClose, children, size = 'md' }: Props) {
         className={`relative w-full ${widthClass} mx-3 my-6 bg-white dark:bg-ipe-navy-800 rounded-lg shadow-xl border border-ipe-stone-200 dark:border-ipe-navy-500/30`}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between px-5 py-3 border-b border-ipe-stone-200 dark:border-ipe-navy-500/30">
-          <h2 className="font-display font-semibold text-ipe-green-700 dark:text-ipe-cream-100">{title}</h2>
+        <header className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-ipe-stone-200 dark:border-ipe-navy-500/30">
+          <h2 className="font-display font-semibold text-ipe-green-700 dark:text-ipe-cream-100 truncate min-w-0 flex-1">
+            {title}
+          </h2>
           <button
             onClick={onClose}
-            className="text-ipe-ink-50 hover:text-ipe-ink p-1 rounded"
+            className="text-ipe-ink-50 hover:text-ipe-ink p-1 rounded shrink-0"
             aria-label="Close"
           >
             <CloseIcon />
           </button>
         </header>
-        <div className="p-5">{children}</div>
+        <div className="p-4 sm:p-5">{children}</div>
       </div>
     </div>,
     document.body,

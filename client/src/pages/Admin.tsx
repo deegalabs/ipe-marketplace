@@ -165,7 +165,7 @@ function TreasuryCard() {
   const fmt = (b: { symbol: string; decimals: number; balance: string }) =>
     `${(Number(b.balance) / 10 ** b.decimals).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${b.symbol}`;
   return (
-    <div className="card p-5">
+    <div className="card p-4 sm:p-5 overflow-hidden">
       <h2 className="text-xl font-semibold text-ipe-green mb-3">Treasury</h2>
       <p className="text-xs text-ipe-ink/60 font-mono break-all mb-3">{data.treasuryAddress}</p>
       <div className="table-wrap">
@@ -384,7 +384,7 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
   const editingProduct = editing && editing !== 'new' ? products.find((p) => p.id === editing) : null;
 
   return (
-    <div className="card p-5">
+    <div className="card p-4 sm:p-5 overflow-hidden">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xl font-semibold text-ipe-green">Products</h2>
         <button className="action-btn-primary" onClick={() => setEditing('new')}>
@@ -808,7 +808,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
     (o.paymentProvider === 'mercadopago' || o.paymentProvider === 'nowpayments');
 
   return (
-    <div className="card p-5">
+    <div className="card p-4 sm:p-5 overflow-hidden">
       <h2 className="text-xl font-semibold text-ipe-green mb-3">Orders</h2>
       {loading && orders.length === 0 ? (
         <TableRowsSkeleton rows={3} cols={6} />
@@ -991,7 +991,7 @@ function EventsCard() {
   const editingEvent = editing && editing !== 'new' ? events.find((e) => e.id === editing) : null;
 
   return (
-    <div className="card p-5">
+    <div className="card p-4 sm:p-5 overflow-hidden">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
         <div className="min-w-0">
           <h2 className="text-xl font-semibold text-ipe-green">Events</h2>
@@ -1418,7 +1418,7 @@ function AdminsCard({ currentAdminId }: { currentAdminId: string | undefined }) 
   }
 
   return (
-    <div className="card p-5">
+    <div className="card p-4 sm:p-5 overflow-hidden">
       <h2 className="text-xl font-semibold text-ipe-green mb-3">Admins</h2>
       <p className="text-xs text-ipe-ink/60 mb-3">
         Anyone whose Privy-linked email is on this list can access /admin.
