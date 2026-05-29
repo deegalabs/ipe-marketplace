@@ -90,7 +90,7 @@ export function InstallPrompt() {
         </p>
       </div>
       {deferred && (
-        <button onClick={install} className="text-xs px-3 py-1.5 rounded bg-ipe-cream text-ipe-green font-medium">
+        <button onClick={install} className="text-xs px-3 py-1.5 rounded bg-ipe-cream text-ipe-navy-900 font-semibold">
           Install
         </button>
       )}
