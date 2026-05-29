@@ -44,6 +44,10 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
   const privyWallet = (connected ?? user?.wallet?.address ?? '').toLowerCase();
   const toast = useToast();
   const [method, setMethod] = useState<GatewayMethod>('pix');
+  // Email used as MP's payer.email when paying via PIX. Pre-fills from Privy
+  // so most buyers don't type anything; wallet-only users (no Privy email)
+  // can still type one here without re-doing the login flow.
+  const [pixEmail, setPixEmail] = useState(privyEmail);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,9 +97,15 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
     // PIX needs an email (Mercado Pago payer.email). Wallet-only Privy logins
     // can still pay via crypto-gateway. We don't validate wallet format because
     // it came from Privy (already validated upstream).
-    if (method === 'pix' && !privyEmail) {
-      setError('PIX needs an email on your account. Sign in with email (or add one in your wallet) and try again.');
-      return;
+    if (method === 'pix') {
+      if (!pixEmail.trim()) {
+        setError('Email is needed for PIX.');
+        return;
+      }
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(pixEmail.trim())) {
+        setError('That email looks invalid.');
+        return;
+      }
     }
     setError(null);
     if (method === 'crypto-gateway') {
@@ -110,7 +120,7 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
     try {
       const res = await api.createGatewayOrder({
         productId: product.id,
-        customerEmail: privyEmail || undefined,
+        customerEmail: pixEmail.trim() || undefined,
         buyerAddress: privyWallet || undefined,
         quantity: 1,
         paymentMethod: 'pix',
@@ -199,7 +209,9 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
           <FormStep
             method={method}
             setMethod={setMethod}
-            email={privyEmail}
+            privyEmail={privyEmail}
+            pixEmail={pixEmail}
+            setPixEmail={setPixEmail}
             wallet={privyWallet}
             totalLabel={totalLabel}
             error={error}
@@ -240,7 +252,9 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
 interface FormStepProps {
   method: GatewayMethod;
   setMethod: (m: GatewayMethod) => void;
-  email: string;
+  privyEmail: string;
+  pixEmail: string;
+  setPixEmail: (v: string) => void;
   wallet: string;
   totalLabel: string;
   error: string | null;
@@ -248,8 +262,7 @@ interface FormStepProps {
   onSubmit: () => void;
 }
 
-function FormStep({ method, setMethod, email, wallet, totalLabel, error, submitting, onSubmit }: FormStepProps) {
-  const pixBlocked = method === 'pix' && !email;
+function FormStep({ method, setMethod, privyEmail, pixEmail, setPixEmail, wallet, totalLabel, error, submitting, onSubmit }: FormStepProps) {
   return (
     <div className="p-5 space-y-4">
       <fieldset className="space-y-2">
@@ -276,41 +289,91 @@ function FormStep({ method, setMethod, email, wallet, totalLabel, error, submitt
         </div>
       </fieldset>
 
-      {/* Identity summary — pulled from Privy. Replaces the old manual inputs. */}
-      <div className="space-y-2 p-3 rounded-md bg-ipe-stone-50 dark:bg-ipe-navy-700/30 border border-ipe-stone-200/60 dark:border-ipe-navy-500/30">
-        <p className="text-2xs font-semibold uppercase tracking-widest text-ipe-ink-50">Linked to your account</p>
-        <div className="space-y-1 text-sm">
-          {email ? (
-            <p className="flex items-center gap-2">
-              <span className="text-ipe-ink-50 text-xs">Email</span>
-              <span className="truncate">{email}</span>
-            </p>
-          ) : (
-            <p className="text-xs text-ipe-ink/60">No email on your account.</p>
-          )}
-          {wallet ? (
-            <p className="flex items-center gap-2 font-mono text-xs">
-              <span className="text-ipe-ink-50 not-italic">Wallet</span>
-              <span className="truncate">{wallet.slice(0, 6)}…{wallet.slice(-4)}</span>
-            </p>
-          ) : (
-            <p className="text-xs text-ipe-ink/60">No wallet linked.</p>
+      {/* PIX-only: email field. Pre-filled from Privy when available, editable
+          for wallet-only logins. Info icon explains the Mercado Pago requirement. */}
+      {method === 'pix' && (
+        <div>
+          <label className="label flex items-center gap-1.5">
+            Email <span className="text-red-600">*</span>
+            <PixEmailInfo />
+          </label>
+          <input
+            className="input"
+            type="email"
+            value={pixEmail}
+            onChange={(e) => setPixEmail(e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email"
+          />
+          {privyEmail && pixEmail === privyEmail && (
+            <p className="text-2xs text-ipe-green dark:text-ipe-gold mt-1">From your account · edit if you want the receipt elsewhere</p>
           )}
         </div>
-      </div>
+      )}
+
+      {/* Identity summary — wallet always shown if linked, email shown only for
+          crypto (PIX shows the dedicated field above). */}
+      {(wallet || (method === 'crypto-gateway' && privyEmail)) && (
+        <div className="space-y-2 p-3 rounded-md bg-ipe-stone-50 dark:bg-ipe-navy-700/30 border border-ipe-stone-200/60 dark:border-ipe-navy-500/30">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-ipe-ink-50">Linked to your account</p>
+          <div className="space-y-1 text-sm">
+            {method === 'crypto-gateway' && privyEmail && (
+              <p className="flex items-center gap-2">
+                <span className="text-ipe-ink-50 text-xs">Email</span>
+                <span className="truncate">{privyEmail}</span>
+              </p>
+            )}
+            {wallet && (
+              <p className="flex items-center gap-2 font-mono text-xs">
+                <span className="text-ipe-ink-50 not-italic">Wallet</span>
+                <span className="truncate">{wallet.slice(0, 6)}…{wallet.slice(-4)}</span>
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <p className="text-sm">Total: <strong>{totalLabel}</strong></p>
 
-      {pixBlocked && (
-        <p className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded p-2.5">
-          PIX needs an email. Sign out and sign in with email (or link an email in your wallet), then come back.
-        </p>
-      )}
       {error && <p className="text-sm text-red-700">{error}</p>}
-      <button className="btn-primary w-full" onClick={onSubmit} disabled={submitting || pixBlocked}>
+      <button className="btn-primary w-full" onClick={onSubmit} disabled={submitting}>
         {submitting ? 'Creating…' : method === 'pix' ? 'Generate PIX QR' : 'Continue'}
       </button>
     </div>
+  );
+}
+
+/// Inline "!" icon next to the PIX email label. Hover or click reveals a
+/// tooltip explaining why Mercado Pago requires the email. Works on touch
+/// (tap toggles), keyboard (focus shows), and pointer (hover shows).
+function PixEmailInfo() {
+  const [open, setOpen] = useState(false);
+  return (
+    <span
+      className="relative inline-flex"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-ipe-ink-30 text-ipe-ink-50 text-[10px] font-bold hover:bg-ipe-stone-100 dark:hover:bg-ipe-navy-700/40"
+        aria-label="Why is email required?"
+      >
+        !
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 w-64 p-2.5 z-20 rounded-md bg-ipe-navy-800 text-ipe-cream-100 text-xs font-normal normal-case tracking-normal shadow-lg pointer-events-none"
+        >
+          Mercado Pago needs the buyer's email to register the PIX transaction (Bacen / LGPD rule).
+          We also use it to send your receipt and pickup updates.
+        </span>
+      )}
+    </span>
   );
 }
 
