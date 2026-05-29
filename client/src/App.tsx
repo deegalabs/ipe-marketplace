@@ -8,6 +8,7 @@ import { ProductPage } from './pages/Product';
 import { Orders } from './pages/Orders';
 import { Admin } from './pages/Admin';
 import { InstallPrompt } from './components/InstallPrompt';
+import { UpdatePrompt } from './components/UpdatePrompt';
 import { Logo, FlowerMark } from './components/Logo';
 import { ThemeToggle } from './components/ThemeToggle';
 import { WalletMenu } from './components/WalletMenu';
@@ -36,6 +37,7 @@ export function App() {
       </main>
       <BottomNav />
       <InstallPrompt />
+      <UpdatePrompt />
       <Footer />
     </div>
   );

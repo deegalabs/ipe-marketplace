@@ -6,7 +6,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' surfaces a "new version available" banner via useRegisterSW
+      // instead of silently reloading. Users in the middle of typing/checkout
+      // get a chance to finish before refreshing.
+      registerType: 'prompt',
       includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png', 'apple-touch-icon-180x180.png'],
       manifest: {
         name: 'Ipê Store',
