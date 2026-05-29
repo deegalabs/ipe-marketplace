@@ -1,205 +1,240 @@
-# ipê.city Marketplace — Architecture
+# Ipê Store — Architecture
 
-> Onchain marketplace on **Base** where each physical item (t-shirt, hoodie, cup, cap) is tokenized as an **ERC-1155**. Payment in **$IPE**. The onchain receipt is both the right to redeem the physical item **and** a resellable asset.
+> Mobile-first PWA where the ipê.city community buys merch with PIX or crypto,
+> picks up at the next event, and (soon) gets an ERC-1155 receipt on Base.
+> This doc captures the **production** topology — the gateway-first PoC that's
+> live at <https://ipe-store.vercel.app>.
 
----
-
-## Stack
-
-Aligned with `ganutf/ipecityapp` so components can be reused and merged in later.
-
-| Layer             | Tech                                                |
-| ----------------- | --------------------------------------------------- |
-| Frontend          | Vite + React 18 + TS + Tailwind + shadcn/ui         |
-| Auth + Wallet     | Privy + wagmi/viem                                  |
-| Backend           | Express + Drizzle + Postgres                        |
-| Contracts         | Foundry (Solidity 0.8.24)                           |
-| Network           | Base Sepolia → Base mainnet                         |
-| Media storage     | IPFS via Pinata (ERC-1155 metadata URIs)            |
-| Indexer           | viem polling → DB (subgraph deferred)               |
+The smart contracts are written and tested but **not yet active in
+production**. The buy flow today goes through payment gateways; the onchain
+mint will be re-enabled once the gateway flow is stable and the resale UX is
+ready.
 
 ---
 
-## Architecture
+## Topology
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│  Client (Vite/React)                                        │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌──────┐  │
-│  │   /shop    │  │  /product  │  │  /orders   │  │/admin│  │
-│  └────────────┘  └────────────┘  └────────────┘  └──────┘  │
-│         │                                                   │
-│         ▼ Privy (Auth) + wagmi (sign/tx)                    │
-└─────────┬─────────────────────────────────────┬────────────┘
-          │                                     │
-          │ REST (catalog, orders)              │ RPC
-          ▼                                     ▼
-┌────────────────────────┐         ┌──────────────────────────┐
-│  Server (Express)      │         │  Base L2                 │
-│  - /products           │         │  ┌────────────────────┐  │
-│  - /orders             │         │  │  IpeMarket (1155)  │  │
-│  - /webhooks/onchain   │ ◄─────  │  │  Purchased event   │  │
-│  - admin endpoints     │ Indexer │  │  Resale event      │  │
-└────────┬───────────────┘         │  └────────────────────┘  │
-         │                         │  ┌────────────────────┐  │
-         ▼                         │  │  $IPE (ERC-20)     │  │
-┌────────────────────┐             │  └────────────────────┘  │
-│ Postgres (Drizzle) │             └──────────────────────────┘
-│  - products        │
-│  - orders (PII enc)│
-│  - shipments       │
-└────────────────────┘
+                             ┌────────────────────────┐
+   PWA / browser ───────────►│  Vercel                │  Vite SPA + service worker
+                             │  (frontend)            │  ipe-store.vercel.app
+                             └─────────┬──────────────┘
+                                       │
+                                       │ REST (JSON) over HTTPS
+                                       ▼
+                             ┌────────────────────────┐
+                             │  Railway               │  Express + Drizzle
+                             │  (backend)             │  ipeserver-production.up.railway.app
+                             └────┬────────┬──────────┘
+                                  │        │
+              ┌───────────────────┘        └──────────────────┐
+              ▼                                               ▼
+       ┌──────────────┐                              ┌──────────────────┐
+       │ Supabase     │                              │ Mercado Pago     │ PIX
+       │ Postgres +   │                              │  (webhook)       │
+       │ Storage      │                              └──────────────────┘
+       └──────────────┘                              ┌──────────────────┐
+              ▲                                      │ NOWPayments      │ Crypto
+              │ images via                           │  (IPN webhook)   │
+              │ public bucket                        └──────────────────┘
+                                                     ┌──────────────────┐
+                                                     │ Resend           │ Email
+                                                     └──────────────────┘
+                                       ▼
+                             ┌────────────────────────┐
+                             │  Base L2 (deferred)    │
+                             │  IpeMarket ERC-1155    │
+                             │  + ERC-2981 royalty    │
+                             │  + internal resale     │
+                             └────────────────────────┘
 ```
 
-### Buy flow
-
-1. Buyer connects via Privy (email / passkey / wallet).
-2. UI lists the catalog (off-chain), each product mapped to a `tokenId`.
-3. Buyer calls `approve(IPE, market)` → `buy(productId, qty)` → contract pulls IPE into the treasury and mints the 1155.
-4. Buyer fills the shipping address → server encrypts and stores the order linked to the `txHash`.
-5. Indexer listens for `Purchased`, marks the order as `paid`.
-6. Admin updates status to `shipped` / `delivered`.
-
----
-
-## Contracts
-
-### `IpeMarket.sol` (ERC-1155 + ERC-2981)
+## Workspaces
 
 ```
-listProduct(price, supply, uri, royaltyBps)   // owner only
-buy(productId, qty)                            // requires prior approve(IPE)
-listForResale(tokenId, qty, price)             // any holder
-buyResale(listingId)                           // pays seller + royalty to treasury
-redeem(productId, qty)                         // burn upon physical delivery (optional)
-withdraw(token, to, amount)                    // owner → treasury
+client/      Vite + React 19 + TS + Tailwind + Privy + wagmi (PWA via vite-plugin-pwa)
+server/      Express + Drizzle + zod + viem + Privy server SDK + Resend + multer
+shared/      zod schemas + ABIs + addresses consumed by both sides
+contracts/   Foundry (Solidity 0.8.24) — IpeMarket + MockIPE + MockUSDC
 ```
 
-### `MockIPE.sol`
+`shared/` keeps API contracts in sync — request/response zod schemas live there,
+so the same validation runs on the client (before sending) and the server
+(before persisting).
 
-Plain ERC-20 used on Base Sepolia only. Replaced with the real $IPE address via env once available.
+## Auth model
 
----
+- **Buyer:** anonymous browse + buy via Privy (email magic link, Google OAuth,
+  or external wallet). PIX requires an email on the Privy account (Mercado
+  Pago needs `payer.email`).
+- **Admin:** Privy access token in `Authorization: Bearer ...`. The server
+  verifies the token, fetches the user from Privy, then checks the linked
+  emails against the `admin_users` table allowlist. Emails reach `admin_users`
+  via verified Privy flows only, so a non-verified email can't impersonate.
 
-## Admin panel — what's different
+`ADMIN_INITIAL_EMAIL` bootstraps the first admin on boot. After that, admins
+are managed in the dashboard.
 
-Vs. a traditional Shopify-style admin:
+## Buy flow (gateway)
 
-**Dual inventory**
-- Onchain stock (`supply` in the contract)
-- Physical stock (DB)
-- Alert when they diverge (e.g. sold onchain but warehouse is empty)
-
-**Payment via event, not webhook**
-- No Stripe. The indexer listens for `Purchased(buyer, tokenId, qty, price, txHash)` on Base.
-- Off-chain order is reconciled by `txHash`.
-
-**Operations cost gas**
-- "Add product" = onchain tx
-- "Refund" = burn 1155 + transfer IPE (tx)
-- UI surfaces gas estimate before confirming
-
-**Treasury**
-- Contract IPE balance visible on the dashboard
-- `withdraw` button (ideally pointing to a multisig Safe)
-- Withdrawal history
-
-**Discount token-gating**
-- Holders of a `*.ipecity.eth` passport get X% off
-- Detected client-side via wagmi/Privy at checkout
-- Validated server-side before generating the quote
-
-**Indexer / health**
-- Panel shows "last indexed tx" — alert if it falls behind
-- Manual re-sync from a specific block
-
----
-
-## Royalties & Resale
-
-### Royalties (ERC-2981)
-
-Each product has `royaltyBps` (e.g. `500` = 5%). External marketplaces (OpenSea on Base) read the standard and route royalties to the treasury automatically on secondary sales.
-
-### Internal resale
-
-`IpeMarket` keeps its own book:
+### PIX
 
 ```
-seller:  listForResale(tokenId, qty, price_in_IPE)
-buyer:   buyResale(listingId)
-         → IPE: buyer → seller (price - royalty)
-         → IPE: buyer → treasury (royalty)
-         → 1155: seller → buyer
+Buyer → /orders/gateway (POST) → server creates order { status: awaiting_payment }
+                                       │
+                                       ▼
+                          Mercado Pago createPixCharge
+                                       │
+                                       ▼
+                      QR + payload returned to buyer
+                                       │
+                                       ▼
+                  Buyer pays in their bank app (any time within ~30min)
+                                       │
+                                       ▼
+        MP fires webhook → /webhooks/mercadopago (HMAC-SHA256 verified)
+                                       │
+                                       ▼
+              Server fetches payment, marks order paid (race-safe)
+                                       │
+                                       ▼
+              Resend sends confirmation email to buyer + admin
 ```
 
-**Pro:** native IPE-denominated resale, same UX as primary purchase, royalty enforcement guaranteed (doesn't depend on OpenSea honoring 2981).
-**Con:** liquidity is fragmented vs. OpenSea — but the two coexist; it's the seller's choice.
+### Crypto
 
----
+Same shape but routed through NOWPayments — buyer picks a coin (BTC, ETH,
+USDC on multiple chains, etc.), the server creates a direct payment, returns
+a BIP-21 / EIP-681 / Solana Pay URI rendered in the modal as a QR. NOWPayments
+fires the IPN webhook (HMAC-SHA512 verified) when funds land, and the order
+flips to paid.
 
-## Multicurrency (what it is, why deferred)
+Both webhooks land in the same `markPaidAndMint(orderId)` path that updates
+the row atomically (single `UPDATE ... WHERE status IN ('pending',
+'awaiting_payment')`) so concurrent retries are idempotent.
 
-**What:** accept payment in multiple tokens (IPE, USDC on Base, ETH) with prices quoted in USD via a price oracle (Chainlink) and on-the-fly swap if the buyer pays in a different token.
+## Refunds
 
-**Why deferred:**
-- Adds an oracle dependency (risk + complexity)
-- Slippage and failed txs become more common
-- $IPE needs real utility first — accepting USDC dilutes that
-- The PoC validates the IPE-only flow with less surface area for bugs
+PIX refunds are automatic — admin clicks Refund, server calls Mercado Pago's
+refund API, order flips to `refunded`. Crypto refunds are **manual** (send
+from treasury, then flip status) because onchain transfers are irreversible
+and NOWPayments doesn't auto-refund.
 
----
+The MP webhook also handles `refunded` / `charged_back` payloads so refunds
+initiated from the MP dashboard sync back to us.
 
-## PoC scope (ships now)
+## Database
 
-| Item                                                     | Status |
-| -------------------------------------------------------- | ------ |
-| `MockIPE` + `IpeMarket` (ERC-1155 + ERC-2981)            | ✅     |
-| Foundry tests (buy, resale, royalty, withdraw)           | ✅     |
-| Base Sepolia deploy script                               | ✅     |
-| Catalog seed: t-shirt, hoodie, cup, cap                  | ✅     |
-| Privy + wagmi connection                                 | ✅     |
-| Buy in IPE (approve + buy)                               | ✅     |
-| "My receipts" page (owned 1155s)                         | ✅     |
-| Internal resale (list + buy)                             | ✅     |
-| Admin: create product                                    | ✅     |
-| Admin: list orders + mark `shipped`                      | ✅     |
-| Admin: view treasury + withdraw                          | ✅     |
-| Encrypted shipping address capture (server-side)         | ✅     |
-| Simple indexer (poll events every N seconds)             | ✅     |
+Schema lives in `server/src/db/schema.ts`. Drizzle generates types and the
+migration with `pnpm db:push`. Notable tables:
 
----
+| Table | Purpose |
+|---|---|
+| `products` | catalog (USD price, stock, category, image URL) |
+| `orders` | every purchase, status machine + payment + delivery details |
+| `events` | admin-curated list of pickup events (shown as dropdown to buyers) |
+| `admin_users` | email allowlist for `/admin` access |
+| `indexer_state` | last block scanned by the chain indexer (currently disabled in prod) |
 
-## Roadmap (post-PoC)
+Sensitive shipping addresses are AES-256-GCM encrypted at rest with
+`SHIPPING_ENCRYPTION_KEY`. The server decrypts on demand for admin views;
+the column is never exposed in plain text in API responses.
 
-| Phase | Item                                                              |
-| ----- | ----------------------------------------------------------------- |
-| v0.2  | Multicurrency (USDC/ETH on Base via Chainlink oracle)             |
-| v0.2  | Multisig treasury (Gnosis Safe)                                   |
-| v0.3  | Discount tier based on $IPE / passport holding                    |
-| v0.3  | Refund/burn flow in admin (with reason + audit log)               |
-| v0.4  | Drop mechanism — Merkle allowlist, mint queue                     |
-| v0.4  | Subgraph (TheGraph) replacing the polling indexer                 |
-| v0.4  | Shopify/carrier webhook to flip `shipped` automatically           |
-| v0.5  | Farcaster Frame to buy from inside the feed                       |
-| v0.5  | Contract audit (Code4rena / Spearbit)                             |
-| v0.5  | Mainnet deploy                                                     |
-| v1.0  | Merge into `ipecityapp` as the `marketplace` module               |
+## Image storage
 
----
+Admins upload product images through the form — the server forwards the
+multipart payload to **Supabase Storage** (`products` bucket, public read),
+saves the public URL on the row, and the storefront serves it through
+Supabase's CDN. Validation runs on both the bucket (5 MB cap + allowed MIME
+types) and the server (`uploadProductImage` in `services/storage.ts`).
 
-## Assumed decisions (correct me if wrong)
+A "Paste URL" mode is kept as fallback for external links (Google Drive,
+direct URLs). Drive share links are auto-rewritten to the thumbnail endpoint.
 
-- Shipping address captured **off-chain** (privacy) — encrypted at rest.
-- No cumulative royalties (royalty applies only to the sale price, not recursively).
-- No royalty splits (100% to the treasury). Splits land in v0.3 if artists/collabs join.
-- No multisig on the PoC treasury — owner is an EOA. Switch to Safe before mainnet.
+## PWA
 
----
+The client ships as an installable PWA via `vite-plugin-pwa`. Notable
+choices:
 
-## Next steps
+- **`registerType: 'prompt'`** — when a new SW is detected, the
+  `UpdatePrompt` banner offers the user a Refresh button. No silent reloads
+  mid-checkout.
+- The hook polls `/sw.js` every 60s while the app is open, so updates land
+  within a minute of deploy.
+- Manifest icon updates require reinstalling the PWA (OS-owned); code
+  updates don't.
 
-1. You hand over the **$IPE** address when ready (using `MockIPE` until then).
-2. Confirm the scope above.
-3. Hand over images/specs for the 4 products (or I'll use placeholders).
-4. I scaffold the monorepo + contracts with tests.
+## Live polling
+
+`useIsFetching()` powers a thin gold progress bar at the top of the viewport
+so users get feedback during background refetches. The admin tabs (orders,
+products) poll every 30s so new gateway orders coming in via webhook appear
+without manual refresh.
+
+## Smart contracts (deferred)
+
+The `IpeMarket` contract is ERC-1155 + ERC-2981 with an internal resale
+book. It's tested but not deployed to mainnet yet — the gateway-first launch
+shipped first to validate the buyer flow without forcing wallet onboarding.
+
+```solidity
+listProduct(maxSupply, royaltyBps, uri, tokens[], prices[])  // owner
+buy(productId, qty, payToken)                                // any wallet
+mintTo(to, productId, qty)                                    // owner (gateway path)
+setPrice(productId, payToken, newPrice)                       // owner
+listForResale(tokenId, qty, price)                            // any holder
+buyResale(listingId)                                          // pays seller + royalty
+redeem(productId, qty)                                        // burns on physical delivery
+withdraw(token, to, amount)                                   // owner → treasury
+```
+
+Once active, the gateway flow snapshots the buyer's wallet on each order so
+admin can mint the receipt later via `mintTo`. The `buyerAddress` field is
+already captured at checkout for this.
+
+See [contracts/AUDIT.md](./contracts/AUDIT.md) (when present) for the
+self-audit + Slither findings.
+
+## Indexer
+
+A polling indexer in `server/src/services/onchain.ts` watches `Purchased`
+events on the `IpeMarket` contract to reconcile direct onchain purchases
+back to the DB. It's gated by `DISABLE_INDEXER=true` in production until
+contracts are live.
+
+## What's not built (intentionally)
+
+- **Multicurrency at checkout** — keeping the UX simple. Coins are listed by
+  NOWPayments at fill time.
+- **Carrier integration** — admins flip `shipped` manually for now. Shopify
+  fulfillment webhook is on the roadmap.
+- **Subgraph** — polling indexer is fine until volume justifies the move to
+  TheGraph.
+- **MFA** — Privy controls auth; we don't add a second layer.
+- **i18n** — strings are hardcoded in English (with selective Portuguese on
+  buyer-facing flows). Will move to i18n once a second language is needed.
+
+## Sizing assumptions
+
+| Constraint | Assumed |
+|---|---|
+| Concurrent buyers | 10s, occasional spikes during a drop |
+| Active products | <100 |
+| Orders per month | <1k |
+| Database size | <500 MB (Supabase free tier) |
+| Image storage | <1 GB (Supabase free tier) |
+
+When these blow out, the obvious upgrades are: Supabase Pro ($25/mo) and a
+Railway resource bump. Nothing in the architecture needs to change.
+
+## Roadmap (rough)
+
+| Phase | Item |
+|---|---|
+| v0.x | Polish admin (size variants, filters, CSV export, audit log) |
+| v0.x | Carrier webhook to auto-flip `shipped` |
+| v0.x | i18n (pt-BR full) |
+| v0.x | Slither + manual audit + Base Sepolia redeploy of contracts |
+| v0.x | Activate onchain mint on order paid (via `mintTo`) |
+| v0.x | Resale UI for buyers (browse → list → buy) |
+| v1.0  | Mainnet deploy + onchain payments live |

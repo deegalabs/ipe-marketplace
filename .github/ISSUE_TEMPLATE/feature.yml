@@ -1,0 +1,28 @@
+name: 💡 Feature request
+description: Suggest something new or an improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the user pain first; the solution second.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What do you have in mind?
+      description: Mockups / sketches / API shape / UX flow — anything that helps.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+    validations:
+      required: false
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else?

@@ -1,0 +1,52 @@
+name: 🐛 Bug report
+description: Something is broken or behaving unexpectedly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time! Please don't report security issues here —
+        see [SECURITY.md](https://github.com/deegalabs/ipe-marketplace/blob/main/SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Clear description + what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open /admin
+        2. Click X
+        3. Notice Y
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where did this happen?
+      options:
+        - Shop / Product page
+        - Checkout (PIX or Crypto)
+        - My Orders
+        - Admin
+        - Contract / onchain
+        - Build / deploy
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: e.g. iPhone 14, Safari · ipe-store.vercel.app · v0.1.0 · abc1234
+    validations:
+      required: false
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else?
+      description: Console errors, screenshots, recordings.

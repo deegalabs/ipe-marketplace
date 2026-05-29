@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Security issue
+    url: https://github.com/deegalabs/ipe-marketplace/security/advisories/new
+    about: Vulnerabilities go through private GitHub Security Advisories — see SECURITY.md.
+  - name: 💬 Discussion / question
+    url: https://github.com/deegalabs/ipe-marketplace/discussions
+    about: For questions and ideas that aren't a bug or a concrete feature.
