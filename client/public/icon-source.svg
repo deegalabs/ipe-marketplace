@@ -20,11 +20,8 @@
   <rect width="512" height="512" rx="96" fill="url(#g2)"/>
   <rect width="512" height="512" rx="96" fill="url(#g3)"/>
 
-  <!-- The "I" letter from the Ipê Store wordmark — chevron at top + curved
-       foot. Source path is from logo-white.svg viewBox 1160×324. The "I"
-       glyph occupies roughly x:0-150, y:88-320 (≈150×232). Scale and center
-       in the 512 canvas. -->
-  <g transform="translate(180 100) scale(1.05)">
-    <path d="M43.4345 262.91V159.589C43.4345 150.704 51.0026 140.833 57.2545 134.581L52.6478 129.974C46.3959 136.226 35.5373 142.807 26.653 142.807C8.88432 142.478 0 133.265 0 115.496C0 97.3984 9.21337 88.5142 27.3111 88.5142H39.4859C52.3188 88.5142 58.8997 94.108 66.4679 110.56C69.7584 117.47 74.365 123.722 80.946 128C96.7404 138.201 102.663 145.769 102.663 156.298V248.761C102.663 261.594 105.954 265.213 118.787 265.542C137.213 265.871 146.098 274.427 146.098 292.524C146.098 310.622 136.884 319.835 118.787 319.835H97.7275C60.874 319.835 43.4345 301.738 43.4345 262.91Z" fill="#EFF2F1"/>
+  <!-- The "ipê" chevron — same shape as favicon.svg, scaled 8× from 64 → 512 canvas. -->
+  <g transform="scale(8)">
+    <path d="M14 44 L32 24 L50 44 L42 44 L32 32 L22 44 Z" fill="#EFF2F1"/>
   </g>
 </svg>
