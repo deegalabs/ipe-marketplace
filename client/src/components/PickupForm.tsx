@@ -44,7 +44,7 @@ export function PickupForm({ value, onChange }: Props) {
         </p>
       </div>
       <p className="text-xs text-ipe-ink/60">
-        Show the order in My orders (or the 1155 receipt on your wallet) at the event to collect.
+        Show the order in My orders at the event to collect.
       </p>
     </fieldset>
   );

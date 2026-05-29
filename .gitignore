@@ -36,3 +36,4 @@ yarn-debug.log*
 *.sqlite
 *.db
 client/tsconfig.tsbuildinfo
+.vercel

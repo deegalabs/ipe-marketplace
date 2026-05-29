@@ -83,7 +83,7 @@ export function InstallPosterModal({ onClose }: { onClose: () => void }) {
                 <span className="font-display font-semibold text-2xl tracking-tight">Ipê Store</span>
               </div>
               <span className="text-2xs uppercase tracking-widest text-ipe-ink-50 font-display">
-                Onchain receipts · Base
+                Community merch · Onchain soon
               </span>
             </div>
 

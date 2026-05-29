@@ -41,7 +41,7 @@ export function Orders() {
     return (
       <EmptyState
         title="No purchases yet"
-        body="When you buy something, your orders show up here with status, tracking and your onchain receipt."
+        body="When you buy something, your orders show up here with status, payment details and pickup or shipping info."
         cta={{ href: '/', label: 'Browse the Shop' }}
       />
     );

@@ -45,7 +45,7 @@ function Footer() {
             <span className="font-display font-semibold text-ipe-ink tracking-tight">Ipê Store</span>
           </div>
           <p className="text-sm text-ipe-ink-70 max-w-xs">
-            Community merch for ipê.city — every purchase recorded on Base, paid in any currency.
+            Community merch for ipê.city — pay with PIX or crypto, pickup at the next event.
           </p>
         </div>
         <div className="space-y-2 text-sm">
@@ -62,7 +62,7 @@ function Footer() {
       <div className="border-t border-ipe-stone-200/40">
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-2 text-2xs text-ipe-ink-50">
           <span>© {new Date().getFullYear()} ipê.city · all rights reserved</span>
-          <span className="font-mono">onchain receipts · paid in any currency</span>
+          <span className="font-mono">paid in any currency · onchain soon</span>
         </div>
       </div>
     </footer>

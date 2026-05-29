@@ -291,7 +291,7 @@ function FormStep({ method, setMethod, email, setEmail, privyFilled, wallet, set
         <p className="text-xs text-ipe-ink/60 mt-1">
           {method === 'pix'
             ? 'Required by Mercado Pago. We also use it for receipt + shipping/pickup updates.'
-            : 'Optional. If provided we send a receipt + pickup updates; otherwise only the onchain receipt.'}
+            : 'Optional. If provided we send a receipt + pickup updates; otherwise track your order in My orders.'}
         </p>
       </div>
 
@@ -301,10 +301,10 @@ function FormStep({ method, setMethod, email, setEmail, privyFilled, wallet, set
           className="input font-mono text-xs"
           value={wallet}
           onChange={(e) => setWallet(e.target.value)}
-          placeholder="0x… (paste to receive your onchain receipt)"
+          placeholder="0x… (optional, for future onchain receipt)"
         />
         <p className="text-xs text-ipe-ink/60 mt-1">
-          If provided, we'll mint your 1155 receipt to this address after payment confirms. Skip to keep it simple.
+          We'll attach this wallet to your order for the upcoming onchain receipt drop on Base. Skip to keep it simple.
         </p>
       </div>
 

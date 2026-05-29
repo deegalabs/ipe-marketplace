@@ -209,7 +209,7 @@ export function ProductPage() {
 
             {!isGateway && tokenId === null && (
               <p className="text-amber-700 text-xs">
-                This product isn't onchain yet — pick "Pay with anything else" to checkout off-chain, or ask the admin to push it onchain.
+                Direct onchain checkout isn't available for this product yet — use "Pay with anything else" to checkout.
               </p>
             )}
             {!isGateway && tokenId !== null && !address && (

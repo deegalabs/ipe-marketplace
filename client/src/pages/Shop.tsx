@@ -55,7 +55,7 @@ function Hero({ count }: { count?: number }) {
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ipe-lime/15 border border-ipe-lime/40">
           <span className="w-1.5 h-1.5 rounded-full bg-ipe-lime animate-pulse-subtle" />
           <span className="text-2xs font-semibold uppercase tracking-widest text-ipe-navy-600 dark:text-ipe-lime">
-            Limited drop · Onchain receipts
+            Limited drop · Community merch
           </span>
         </div>
         <h1 className="text-hero sm:text-display font-display text-ipe-navy-600 dark:text-ipe-cream-100 leading-[0.95]">
@@ -63,8 +63,8 @@ function Hero({ count }: { count?: number }) {
           <span className="text-ipe-ink-70 font-medium">Carry the chain.</span>
         </h1>
         <p className="text-ipe-ink-70 text-base sm:text-lg max-w-prose leading-relaxed">
-          Community merch for ipê.city — every purchase recorded on Base, paid in any currency,
-          shipped from the next event.
+          Community merch for ipê.city — pay with PIX or crypto and pick up at the next event.
+          Onchain receipts coming soon on Base.
         </p>
         {count !== undefined && (
           <div className="flex items-center gap-4 pt-2 text-2xs font-display uppercase tracking-widest text-ipe-ink-50">
