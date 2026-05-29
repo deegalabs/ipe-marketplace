@@ -290,21 +290,25 @@ function FormStep({ method, setMethod, privyEmail, pixEmail, setPixEmail, wallet
       </fieldset>
 
       {/* PIX-only: email field. Pre-filled from Privy when available, editable
-          for wallet-only logins. Info icon explains the Mercado Pago requirement. */}
+          for wallet-only logins. Info icon lives inside the input on the right. */}
       {method === 'pix' && (
         <div>
-          <label className="label flex items-center gap-1.5">
+          <label className="label">
             Email <span className="text-red-600">*</span>
-            <PixEmailInfo />
           </label>
-          <input
-            className="input"
-            type="email"
-            value={pixEmail}
-            onChange={(e) => setPixEmail(e.target.value)}
-            placeholder="you@example.com"
-            autoComplete="email"
-          />
+          <div className="relative">
+            <input
+              className="input pr-10"
+              type="email"
+              value={pixEmail}
+              onChange={(e) => setPixEmail(e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+            />
+            <div className="absolute inset-y-0 right-2 flex items-center">
+              <PixEmailInfo />
+            </div>
+          </div>
           {privyEmail && pixEmail === privyEmail && (
             <p className="text-2xs text-ipe-green dark:text-ipe-gold mt-1">From your account · edit if you want the receipt elsewhere</p>
           )}
@@ -367,7 +371,7 @@ function PixEmailInfo() {
       {open && (
         <span
           role="tooltip"
-          className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 w-64 p-2.5 z-20 rounded-md bg-ipe-navy-800 text-ipe-cream-100 text-xs font-normal normal-case tracking-normal shadow-lg pointer-events-none"
+          className="absolute right-0 bottom-full mb-1.5 w-64 p-2.5 z-20 rounded-md bg-ipe-navy-800 text-ipe-cream-100 text-xs font-normal normal-case tracking-normal shadow-lg pointer-events-none"
         >
           Mercado Pago needs the buyer's email to register the PIX transaction (Bacen / LGPD rule).
           We also use it to send your receipt and pickup updates.
