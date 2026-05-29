@@ -35,13 +35,15 @@ interface Props {
 export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }: Props) {
   const { address: connected } = useAccount();
   const { user } = usePrivy();
+  // Pull identity straight from Privy. No manual inputs — keeps the form short
+  // and guarantees the email is the verified Privy one (so admins can trust
+  // it for shipping notifications). The wallet comes from whatever Privy
+  // returns: either the connected external wallet or the embedded one Privy
+  // creates for email-only users.
   const privyEmail = user?.email?.address ?? '';
+  const privyWallet = (connected ?? user?.wallet?.address ?? '').toLowerCase();
   const toast = useToast();
   const [method, setMethod] = useState<GatewayMethod>('pix');
-  // Pre-fill from the buyer's Privy account so they don't re-type it every
-  // checkout. Editable in case they want to send the receipt elsewhere.
-  const [email, setEmail] = useState(privyEmail);
-  const [wallet, setWallet] = useState(connected ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,10 +90,13 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
   const totalLabel = method === 'pix' ? brlPreview : `~$${usdAmount.toFixed(2)} USD`;
 
   function next() {
-    // Email only required for PIX (Mercado Pago needs payer.email). Wallet-only
-    // Privy logins (e.g. MetaMask) can still buy via crypto-gateway without it.
-    if (method === 'pix' && !email) { setError('Email is required for PIX.'); return; }
-    if (wallet && !/^0x[a-fA-F0-9]{40}$/.test(wallet)) { setError('Wallet looks invalid.'); return; }
+    // PIX needs an email (Mercado Pago payer.email). Wallet-only Privy logins
+    // can still pay via crypto-gateway. We don't validate wallet format because
+    // it came from Privy (already validated upstream).
+    if (method === 'pix' && !privyEmail) {
+      setError('PIX needs an email on your account. Sign in with email (or add one in your wallet) and try again.');
+      return;
+    }
     setError(null);
     if (method === 'crypto-gateway') {
       setStep('pick-coin');
@@ -105,8 +110,8 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
     try {
       const res = await api.createGatewayOrder({
         productId: product.id,
-        customerEmail: email || undefined,
-        buyerAddress: wallet || undefined,
+        customerEmail: privyEmail || undefined,
+        buyerAddress: privyWallet || undefined,
         quantity: 1,
         paymentMethod: 'pix',
         deliveryMethod: delivery,
@@ -129,8 +134,8 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
     try {
       const res = await api.createGatewayOrder({
         productId: product.id,
-        customerEmail: email || undefined,
-        buyerAddress: wallet || undefined,
+        customerEmail: privyEmail || undefined,
+        buyerAddress: privyWallet || undefined,
         quantity: 1,
         paymentMethod: 'crypto-gateway',
         payCurrency: ticker,
@@ -194,11 +199,8 @@ export function GatewayCheckout({ product, delivery, shipping, pickup, onClose }
           <FormStep
             method={method}
             setMethod={setMethod}
-            email={email}
-            setEmail={setEmail}
-            privyFilled={!!privyEmail && email === privyEmail}
-            wallet={wallet}
-            setWallet={setWallet}
+            email={privyEmail}
+            wallet={privyWallet}
             totalLabel={totalLabel}
             error={error}
             submitting={submitting}
@@ -239,17 +241,15 @@ interface FormStepProps {
   method: GatewayMethod;
   setMethod: (m: GatewayMethod) => void;
   email: string;
-  setEmail: (v: string) => void;
-  privyFilled: boolean;
   wallet: string;
-  setWallet: (v: string) => void;
   totalLabel: string;
   error: string | null;
   submitting: boolean;
   onSubmit: () => void;
 }
 
-function FormStep({ method, setMethod, email, setEmail, privyFilled, wallet, setWallet, totalLabel, error, submitting, onSubmit }: FormStepProps) {
+function FormStep({ method, setMethod, email, wallet, totalLabel, error, submitting, onSubmit }: FormStepProps) {
+  const pixBlocked = method === 'pix' && !email;
   return (
     <div className="p-5 space-y-4">
       <fieldset className="space-y-2">
@@ -276,41 +276,38 @@ function FormStep({ method, setMethod, email, setEmail, privyFilled, wallet, set
         </div>
       </fieldset>
 
-      <div>
-        <label className="label">
-          Email {method === 'pix' ? '(required)' : '(optional)'}
-          {privyFilled && <span className="ml-2 text-2xs text-ipe-green dark:text-ipe-gold normal-case font-medium tracking-normal">· from your account</span>}
-        </label>
-        <input
-          className="input"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
-        />
-        <p className="text-xs text-ipe-ink/60 mt-1">
-          {method === 'pix'
-            ? 'Required by Mercado Pago. We also use it for receipt + shipping/pickup updates.'
-            : 'Optional. If provided we send a receipt + pickup updates; otherwise track your order in My orders.'}
-        </p>
-      </div>
-
-      <div>
-        <label className="label">Wallet (optional)</label>
-        <input
-          className="input font-mono text-xs"
-          value={wallet}
-          onChange={(e) => setWallet(e.target.value)}
-          placeholder="0x… (optional, for future onchain receipt)"
-        />
-        <p className="text-xs text-ipe-ink/60 mt-1">
-          We'll attach this wallet to your order for the upcoming onchain receipt drop on Base. Skip to keep it simple.
-        </p>
+      {/* Identity summary — pulled from Privy. Replaces the old manual inputs. */}
+      <div className="space-y-2 p-3 rounded-md bg-ipe-stone-50 dark:bg-ipe-navy-700/30 border border-ipe-stone-200/60 dark:border-ipe-navy-500/30">
+        <p className="text-2xs font-semibold uppercase tracking-widest text-ipe-ink-50">Linked to your account</p>
+        <div className="space-y-1 text-sm">
+          {email ? (
+            <p className="flex items-center gap-2">
+              <span className="text-ipe-ink-50 text-xs">Email</span>
+              <span className="truncate">{email}</span>
+            </p>
+          ) : (
+            <p className="text-xs text-ipe-ink/60">No email on your account.</p>
+          )}
+          {wallet ? (
+            <p className="flex items-center gap-2 font-mono text-xs">
+              <span className="text-ipe-ink-50 not-italic">Wallet</span>
+              <span className="truncate">{wallet.slice(0, 6)}…{wallet.slice(-4)}</span>
+            </p>
+          ) : (
+            <p className="text-xs text-ipe-ink/60">No wallet linked.</p>
+          )}
+        </div>
       </div>
 
       <p className="text-sm">Total: <strong>{totalLabel}</strong></p>
+
+      {pixBlocked && (
+        <p className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded p-2.5">
+          PIX needs an email. Sign out and sign in with email (or link an email in your wallet), then come back.
+        </p>
+      )}
       {error && <p className="text-sm text-red-700">{error}</p>}
-      <button className="btn-primary w-full" onClick={onSubmit} disabled={submitting}>
+      <button className="btn-primary w-full" onClick={onSubmit} disabled={submitting || pixBlocked}>
         {submitting ? 'Creating…' : method === 'pix' ? 'Generate PIX QR' : 'Continue'}
       </button>
     </div>
