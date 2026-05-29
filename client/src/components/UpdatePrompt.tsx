@@ -47,7 +47,16 @@ export function UpdatePrompt() {
       <button
         onClick={async () => {
           setApplying(true);
-          await updateServiceWorker(true);
+          try {
+            await updateServiceWorker(true);
+            // Belt and suspenders: if the controllerchange event doesn't fire
+            // within ~2s (some browsers/PWA hosts swallow it), force the reload
+            // ourselves. updateServiceWorker(true) is supposed to reload but
+            // we've seen it hang on installed PWAs.
+            setTimeout(() => window.location.reload(), 2000);
+          } catch {
+            window.location.reload();
+          }
         }}
         disabled={applying}
         className="text-xs px-3 py-1.5 rounded bg-ipe-gold text-ipe-navy-900 font-semibold hover:bg-ipe-gold/90 disabled:opacity-60"
