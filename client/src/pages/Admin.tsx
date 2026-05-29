@@ -1278,7 +1278,7 @@ function ImageUrlField({ value, onChange }: { value: string; onChange: (v: strin
           )}
         </div>
 
-        <div className="w-20 h-20 rounded border border-ipe-stone-200 dark:border-ipe-navy-500/30 bg-ipe-stone-50 dark:bg-ipe-navy-700/30 overflow-hidden flex items-center justify-center text-[10px] text-ipe-ink-50 shrink-0">
+        <div className="w-32 sm:w-40 aspect-square self-start rounded-md border border-ipe-stone-200 dark:border-ipe-navy-500/30 bg-ipe-stone-50 dark:bg-ipe-navy-700/30 overflow-hidden flex items-center justify-center text-xs text-ipe-ink-50 shrink-0">
           {resolved ? (
             <img
               src={resolved}
