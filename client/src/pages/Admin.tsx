@@ -60,8 +60,18 @@ export function Admin() {
   const [posterOpen, setPosterOpen] = useState(false);
   const [tab, setTab] = useTabFromUrl();
   const meQ = useQuery({ queryKey: ['admin-me'], queryFn: api.adminMe });
-  const productsQ = useQuery({ queryKey: ['products'], queryFn: api.listProducts });
-  const ordersQ = useQuery({ queryKey: ['admin-orders'], queryFn: api.adminOrders });
+  // Poll every 30s so new orders (from webhooks) and updated stock appear without
+  // a manual reload. Admin tab is usually open in the background during sales.
+  const productsQ = useQuery({
+    queryKey: ['products'],
+    queryFn: api.listProducts,
+    refetchInterval: 30_000,
+  });
+  const ordersQ = useQuery({
+    queryKey: ['admin-orders'],
+    queryFn: api.adminOrders,
+    refetchInterval: 30_000,
+  });
 
   return (
     <section className="space-y-6">
@@ -279,6 +289,12 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
 
   async function pushOnchain(p: ProductDTO) {
     if (!publicClient) return;
+    const ok = await confirm({
+      title: 'Push product onchain?',
+      body: <>Mint <strong>{p.name}</strong> on Base. This sends a transaction from your connected wallet and costs gas. Once onchain, the tokenId is permanent.</>,
+      confirmLabel: 'Push onchain',
+    });
+    if (!ok) return;
     setBusyId(p.id);
     try {
       const tokens: `0x${string}`[] = [];
@@ -320,6 +336,12 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
 
   async function syncPriceOnchain(p: ProductDTO, token: 'ipe' | 'usdc') {
     if (!publicClient || !p.tokenId) return;
+    const ok = await confirm({
+      title: `Sync ${token.toUpperCase()} price onchain?`,
+      body: <>Update the onchain price for <strong>{p.name}</strong> to match the database. This sends a transaction and costs gas.</>,
+      confirmLabel: 'Sync price',
+    });
+    if (!ok) return;
     const tokenAddr = token === 'ipe' ? env.ipeToken : env.usdcToken;
     const newPrice = BigInt(token === 'ipe' ? p.priceIpe : p.priceUsdc);
     setBusyId(p.id);
@@ -717,9 +739,23 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
   const confirm = useConfirm();
   const productById = new Map(products.map((p) => [p.id, p] as const));
 
-  async function setStatus(id: string, status: string) {
+  async function setStatus(o: OrderDTO, status: string) {
+    // Confirm transitions that have visible side effects (email to the buyer).
+    const emailNote = status === 'shipped'
+      ? (o.deliveryMethod === 'pickup' ? 'A "ready for pickup" email will be sent to the buyer.' : 'A "shipped" email with tracking will be sent to the buyer.')
+      : status === 'delivered'
+        ? 'A "delivered" email will be sent to the buyer.'
+        : null;
+    if (emailNote) {
+      const ok = await confirm({
+        title: `Mark as ${status}?`,
+        body: <>{emailNote} Continue?</>,
+        confirmLabel: `Mark as ${status}`,
+      });
+      if (!ok) return;
+    }
     try {
-      await api.updateOrder(id, { status });
+      await api.updateOrder(o.id, { status });
       await qc.invalidateQueries({ queryKey: ['admin-orders'] });
       toast.success('Order updated', `Status → ${status}`);
     } catch (err) {
@@ -786,12 +822,12 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {o.status === 'paid' && (
-                      <button className="action-btn-ghost" onClick={() => setStatus(o.id, 'shipped')}>
+                      <button className="action-btn-ghost" onClick={() => setStatus(o, 'shipped')}>
                         <TruckIcon /> {o.deliveryMethod === 'pickup' ? 'Mark delivered' : 'Mark shipped'}
                       </button>
                     )}
                     {o.status === 'shipped' && (
-                      <button className="action-btn-ghost" onClick={() => setStatus(o.id, 'delivered')}>
+                      <button className="action-btn-ghost" onClick={() => setStatus(o, 'delivered')}>
                         <PackageCheckIcon /> Mark delivered
                       </button>
                     )}
@@ -843,12 +879,12 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                       <td>
                         <div className="flex flex-wrap gap-1">
                           {o.status === 'paid' && (
-                            <button className="btn-ghost text-xs" onClick={() => setStatus(o.id, 'shipped')}>
+                            <button className="btn-ghost text-xs" onClick={() => setStatus(o, 'shipped')}>
                               {o.deliveryMethod === 'pickup' ? 'Mark delivered' : 'Mark shipped'}
                             </button>
                           )}
                           {o.status === 'shipped' && (
-                            <button className="btn-ghost text-xs" onClick={() => setStatus(o.id, 'delivered')}>
+                            <button className="btn-ghost text-xs" onClick={() => setStatus(o, 'delivered')}>
                               Mark delivered
                             </button>
                           )}
@@ -1226,6 +1262,15 @@ function AdminsCard({ currentAdminId }: { currentAdminId: string | undefined }) 
   }
 
   async function toggle(a: AdminUserDTO) {
+    if (a.active) {
+      const ok = await confirm({
+        title: 'Deactivate admin?',
+        body: <><strong>{a.email}</strong> will lose access to the admin panel immediately. Reactivate anytime.</>,
+        confirmLabel: 'Deactivate',
+        destructive: true,
+      });
+      if (!ok) return;
+    }
     try {
       await api.updateAdmin(a.id, { active: !a.active });
       await qc.invalidateQueries({ queryKey: ['admins'] });
