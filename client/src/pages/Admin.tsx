@@ -781,7 +781,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                     {o.deliveryMethod === 'shipping' && addr
                       ? `→ ${addr.line1}, ${addr.city} (${addr.country})`
                       : o.deliveryMethod === 'pickup' && o.pickup
-                        ? `pickup @ ${o.pickup.eventId}`
+                        ? `pickup @ ${o.pickup.displayName || o.pickup.eventId}`
                         : '—'}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -836,7 +836,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                         {o.deliveryMethod === 'shipping' && addr
                           ? `→ ${addr.line1}, ${addr.city} (${addr.country})`
                           : o.deliveryMethod === 'pickup' && o.pickup
-                            ? `pickup @ ${o.pickup.eventId}`
+                            ? `pickup @ ${o.pickup.displayName || o.pickup.eventId}`
                             : '—'}
                       </td>
                       <td><span className={`text-xs px-2 py-0.5 rounded ${badgeForStatus(o.status)}`}>{o.status}</span></td>

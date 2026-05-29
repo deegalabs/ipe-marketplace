@@ -95,7 +95,7 @@ function OrderRow({ order: o, product }: { order: OrderDTO; product: ProductDTO 
             <span className="uppercase text-2xs tracking-wider">{methodLabel(o.paymentMethod)}</span>
             <span className="text-ipe-ink/30">·</span>
             <span className="text-2xs">
-              {o.deliveryMethod === 'pickup' ? `pickup${o.pickup ? ` @ ${o.pickup.eventId}` : ''}` : 'shipping'}
+              {o.deliveryMethod === 'pickup' ? `pickup${o.pickup ? ` @ ${o.pickup.displayName || o.pickup.eventId}` : ''}` : 'shipping'}
             </span>
           </div>
 

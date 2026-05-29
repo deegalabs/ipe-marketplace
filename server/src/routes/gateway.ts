@@ -66,6 +66,16 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
 
   const provider = parsed.data.paymentMethod === 'pix' ? 'mercadopago' : 'nowpayments';
 
+  // Look up the event's human name + date so we can snapshot them on the order.
+  // If the event later changes or gets deleted, the order keeps the original info.
+  let pickupName: string | null = parsed.data.pickup?.displayName ?? null;
+  if (parsed.data.pickup?.eventId) {
+    const evt = await db.query.events.findFirst({
+      where: eq(schema.events.slug, parsed.data.pickup.eventId),
+    });
+    if (evt) pickupName = evt.name;
+  }
+
   // Insert as awaiting_payment. We'll fill paymentRef + checkout details below.
   const [order] = await db
     .insert(schema.orders)
@@ -82,7 +92,7 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
       deliveryMethod: parsed.data.deliveryMethod,
       shippingAddressEnc: parsed.data.shippingAddress ? encryptAddress(parsed.data.shippingAddress) : null,
       pickupEventId: parsed.data.pickup?.eventId ?? null,
-      pickupDisplayName: parsed.data.pickup?.displayName ?? null,
+      pickupDisplayName: pickupName,
     })
     .returning();
   if (!order) return res.status(500).json({ error: 'order insert failed' });
