@@ -76,18 +76,18 @@ export function Admin() {
   return (
     <section className="space-y-6">
       <header className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold text-ipe-green">Admin</h1>
-          <p className="text-sm text-ipe-ink/60">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-ipe-green">Admin</h1>
+          <p className="text-xs sm:text-sm text-ipe-ink/60 truncate">
             Signed in as {meQ.data?.email ?? user?.email?.address ?? '—'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setPosterOpen(true)} className="action-btn-ghost">
-            <PrinterIcon /> Install poster
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={() => setPosterOpen(true)} className="action-btn-ghost" title="Install poster">
+            <PrinterIcon /> <span className="hidden sm:inline">Install poster</span>
           </button>
-          <button onClick={logout} className="action-btn-ghost">
-            <SignOutIcon /> Sign out
+          <button onClick={logout} className="action-btn-ghost" title="Sign out">
+            <SignOutIcon /> <span className="hidden sm:inline">Sign out</span>
           </button>
         </div>
       </header>
@@ -992,14 +992,14 @@ function EventsCard() {
 
   return (
     <div className="card p-5">
-      <div className="flex items-center justify-between mb-3">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold text-ipe-green">Events</h2>
           <p className="text-xs text-ipe-ink/60 mt-1">
             Active events show as a dropdown in the buyer's pickup form. Add the next meetup so buyers don't have to guess the slug.
           </p>
         </div>
-        <button className="action-btn-primary" onClick={() => setEditing('new')}>
+        <button className="action-btn-primary self-start sm:self-auto shrink-0" onClick={() => setEditing('new')}>
           <PlusIcon /> New event
         </button>
       </div>
@@ -1011,16 +1011,16 @@ function EventsCard() {
 
       <ul className="divide-y divide-ipe-green/10">
         {events.map((e) => (
-          <li key={e.id} className="py-3 flex items-start justify-between gap-3 text-sm">
+          <li key={e.id} className="py-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 text-sm">
             <div className="min-w-0 flex-1">
               <p className="font-medium">{e.name}</p>
-              <p className="text-xs text-ipe-ink/60 mt-0.5">
-                <span className="font-mono">{e.slug}</span> · {new Date(e.date).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+              <p className="text-xs text-ipe-ink/60 mt-0.5 break-words">
+                <span className="font-mono break-all">{e.slug}</span> · {new Date(e.date).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
                 {e.location && <> · 📍 {e.location}</>}
                 {!e.active && <span className="text-red-600 ml-2">inactive</span>}
               </p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button className="action-btn-ghost" onClick={() => setEditing(e.id)}>
                 <PencilIcon /> Edit
               </button>
@@ -1225,8 +1225,8 @@ function ImageUrlField({ value, onChange }: { value: string; onChange: (v: strin
 
   return (
     <div className="space-y-2">
-      <div className="flex gap-3">
-        <div className="flex-1 space-y-2">
+      <div className="flex flex-col-reverse sm:flex-row gap-3">
+        <div className="flex-1 space-y-2 min-w-0">
           {/* Mode tabs */}
           <div className="inline-flex gap-1 text-xs rounded-md p-0.5 bg-ipe-stone-100 dark:bg-ipe-navy-700/40">
             <button
@@ -1278,7 +1278,7 @@ function ImageUrlField({ value, onChange }: { value: string; onChange: (v: strin
           )}
         </div>
 
-        <div className="w-32 sm:w-40 aspect-square self-start rounded-md border border-ipe-stone-200 dark:border-ipe-navy-500/30 bg-ipe-stone-50 dark:bg-ipe-navy-700/30 overflow-hidden flex items-center justify-center text-xs text-ipe-ink-50 shrink-0">
+        <div className="w-32 sm:w-40 aspect-square self-center sm:self-start mx-auto sm:mx-0 rounded-md border border-ipe-stone-200 dark:border-ipe-navy-500/30 bg-ipe-stone-50 dark:bg-ipe-navy-700/30 overflow-hidden flex items-center justify-center text-xs text-ipe-ink-50 shrink-0">
           {resolved ? (
             <img
               src={resolved}
@@ -1462,7 +1462,7 @@ function AdminsCard({ currentAdminId }: { currentAdminId: string | undefined }) 
         {(adminsQ.data ?? []).map((a) => {
           const isSelf = a.id === currentAdminId;
           return (
-            <li key={a.id} className="py-2 flex items-center justify-between gap-3 text-sm">
+            <li key={a.id} className="py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 text-sm">
               <div className="flex-1 min-w-0">
                 <p className="truncate">
                   {a.email}
@@ -1473,7 +1473,7 @@ function AdminsCard({ currentAdminId }: { currentAdminId: string | undefined }) 
                   added {new Date(a.createdAt).toLocaleDateString()} · {a.active ? 'active' : 'inactive'}
                 </p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <button
                   className={a.active ? 'action-btn-destructive' : 'action-btn-primary'}
                   onClick={() => toggle(a)}
