@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { CloseIcon } from './AdminIcons';
 
 interface Props {
@@ -27,7 +28,10 @@ export function Modal({ title, onClose, children, size = 'md' }: Props) {
 
   const widthClass = size === 'lg' ? 'max-w-4xl' : 'max-w-2xl';
 
-  return (
+  // Portal to <body> so the modal escapes any parent containing block.
+  // Cards on the page use `backdrop-filter`, which would otherwise trap
+  // `position: fixed` inside the card (CSS spec quirk).
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
@@ -51,6 +55,7 @@ export function Modal({ title, onClose, children, size = 'md' }: Props) {
         </header>
         <div className="p-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
