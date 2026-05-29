@@ -76,8 +76,19 @@ function Footer() {
 }
 
 function Header() {
-  const { authenticated, login, logout, user } = usePrivy();
+  const { authenticated, ready, login, logout, user } = usePrivy();
   const wallet = user?.wallet?.address;
+  // Only probes /admin/me when the user is signed in — anonymous visitors
+  // never see the Admin link and don't hit the endpoint. 403/401 is fine
+  // (just means "not admin"); we don't retry to avoid log noise.
+  const adminMeQ = useQuery({
+    queryKey: ['admin-me'],
+    queryFn: api.adminMe,
+    enabled: ready && authenticated,
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
+  const isAdmin = !!adminMeQ.data?.adminId;
 
   return (
     <header
@@ -93,9 +104,18 @@ function Header() {
           <NavLink href="/" label="Shop" />
           <NavLink href="/orders" label="My orders" />
         </nav>
-        {/* Theme toggle + connect — same row on every breakpoint */}
+        {/* Theme toggle + admin (if admin) + connect — same row on every breakpoint */}
         <div className="flex items-center gap-2">
           <ThemeToggle />
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-md border border-ipe-gold/40 text-ipe-navy-700 dark:text-ipe-gold hover:bg-ipe-gold/10 transition-colors"
+              title="Admin dashboard"
+            >
+              Admin
+            </Link>
+          )}
           {authenticated && wallet ? (
             <WalletMenu address={wallet} onDisconnect={() => logout()} />
           ) : (
