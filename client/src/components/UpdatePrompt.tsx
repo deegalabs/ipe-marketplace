@@ -42,7 +42,9 @@ export function UpdatePrompt() {
     >
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium">New version available</p>
-        <p className="text-xs opacity-80 mt-0.5">Refresh to get the latest improvements.</p>
+        <p className="text-xs opacity-80 mt-0.5 font-mono">
+          you're on v{__APP_VERSION__} · {__COMMIT_SHA__}
+        </p>
       </div>
       <button
         onClick={async () => {

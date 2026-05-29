@@ -13,6 +13,7 @@ import { useConfirm } from '../lib/confirm';
 import { SkeletonBox, SkeletonText } from '../components/Skeleton';
 import { InstallPosterModal } from '../components/InstallPosterModal';
 import { Modal } from '../components/Modal';
+import { VersionBadge } from '../components/VersionBadge';
 import {
   PlusIcon, PencilIcon, SignOutIcon, PrinterIcon, UploadIcon, RefreshIcon,
   TruckIcon, PackageCheckIcon, UserCheckIcon, UserOffIcon, TrashIcon, SpinnerIcon,
@@ -81,6 +82,7 @@ export function Admin() {
           <p className="text-xs sm:text-sm text-ipe-ink/60 truncate">
             Signed in as {meQ.data?.email ?? user?.email?.address ?? '—'}
           </p>
+          <VersionBadge className="mt-0.5" />
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button onClick={() => setPosterOpen(true)} className="action-btn-ghost" title="Install poster">

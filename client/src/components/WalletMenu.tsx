@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useToast } from '../lib/toast';
+import { VersionBadge } from './VersionBadge';
 
 /// Header wallet pill — click reveals a small popover with the full address,
 /// a Copy button, and Disconnect. Avoids the previous footgun where a single
@@ -67,6 +68,9 @@ export function WalletMenu({ address, onDisconnect }: { address: string; onDisco
             >
               <DisconnectIcon /> Disconnect
             </button>
+          </div>
+          <div className="pt-2 border-t border-ipe-stone-200/60 dark:border-ipe-navy-500/30 text-center">
+            <VersionBadge />
           </div>
         </div>
       )}

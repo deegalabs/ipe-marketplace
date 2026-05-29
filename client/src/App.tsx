@@ -9,6 +9,7 @@ import { Orders } from './pages/Orders';
 import { Admin } from './pages/Admin';
 import { InstallPrompt } from './components/InstallPrompt';
 import { UpdatePrompt } from './components/UpdatePrompt';
+import { VersionBadge } from './components/VersionBadge';
 import { Logo, FlowerMark } from './components/Logo';
 import { ThemeToggle } from './components/ThemeToggle';
 import { WalletMenu } from './components/WalletMenu';
@@ -70,7 +71,10 @@ function Footer() {
       <div className="border-t border-ipe-stone-200/40">
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-2 text-2xs text-ipe-ink-50">
           <span>© {new Date().getFullYear()} ipê.city · all rights reserved</span>
-          <span className="font-mono">paid in any currency · onchain soon</span>
+          <div className="flex items-center gap-3">
+            <span className="font-mono">paid in any currency · onchain soon</span>
+            <VersionBadge />
+          </div>
         </div>
       </div>
     </footer>
