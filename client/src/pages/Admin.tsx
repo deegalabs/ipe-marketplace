@@ -281,7 +281,27 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
       await qc.invalidateQueries({ queryKey: ['products'] });
       toast.success('Product deleted', p.name);
     } catch (err) {
-      toast.error('Delete failed', err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      // The server blocks delete when orders reference this product (FK). Offer
+      // Deactivate as the natural next step instead of just toasting an error.
+      if (msg.includes('existing orders')) {
+        setBusyId(null);
+        const deactivate = await confirm({
+          title: "Can't delete — this product has orders",
+          body: (
+            <>
+              <strong>{p.name}</strong> has past orders, so deleting it would break the
+              order history. Use <strong>Deactivate</strong> instead — it hides the
+              product from the shop while keeping the history intact (you can reactivate anytime).
+            </>
+          ),
+          confirmLabel: 'Deactivate instead',
+          destructive: true,
+        });
+        if (deactivate) await setActive(p, false);
+        return;
+      }
+      toast.error('Delete failed', msg);
     } finally {
       setBusyId(null);
     }
