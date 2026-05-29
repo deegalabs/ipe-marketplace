@@ -24,13 +24,19 @@ export function PickupForm({ value, onChange }: Props) {
   const [draft, setDraft] = useState<PickupFormValues>({ eventId: defaultSlug });
 
   // When events load, surface the default to the parent so the Checkout CTA
-  // enables without forcing the buyer to touch the field.
+  // enables without forcing the buyer to touch the field. If the list is empty
+  // we explicitly clear the draft so a stale slug from a previous render
+  // doesn't keep the CTA enabled.
   useEffect(() => {
-    if (events.length && !draft.eventId) {
+    if (events.length === 0) {
+      if (draft.eventId) setDraft({ eventId: '' });
+      return;
+    }
+    if (!draft.eventId) {
       const next = { eventId: events[0].slug };
       setDraft(next);
       onChange(next);
-    } else if (draft.eventId) {
+    } else {
       onChange(draft);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -66,23 +72,21 @@ export function PickupForm({ value, onChange }: Props) {
       )}
 
       {!eventsQ.isLoading && events.length === 0 && (
-        <div>
-          <label className="label">Event slug</label>
-          <input
-            className="input"
-            value={draft.eventId}
-            placeholder="ipe-demo-day-2026"
-            onChange={(e) => update(e.target.value)}
-          />
-          <p className="text-xs text-ipe-ink/60 mt-1">
-            No events configured yet. Enter the event slug or ask the admin to add one.
+        <div className="p-3.5 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800/50">
+          <p className="text-sm text-amber-800 dark:text-amber-200 font-medium">
+            No pickup events scheduled right now.
+          </p>
+          <p className="text-xs text-amber-700 dark:text-amber-300/80 mt-1">
+            Choose shipping above, or check back soon — the next event will appear here once the admin schedules it.
           </p>
         </div>
       )}
 
-      <p className="text-xs text-ipe-ink/60">
-        Show the order in My orders at the event to collect.
-      </p>
+      {events.length > 0 && (
+        <p className="text-xs text-ipe-ink/60">
+          Show the order in My orders at the event to collect.
+        </p>
+      )}
     </fieldset>
   );
 }
