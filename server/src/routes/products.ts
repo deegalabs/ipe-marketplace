@@ -50,6 +50,24 @@ function toRow<T extends Record<string, unknown>>(data: T): Record<string, unkno
   return out;
 }
 
+/// Hard-delete a product. Refuses if there are any orders referencing it
+/// (FK would block anyway; we check first to return a friendly message).
+/// Use PATCH { active: false } for the soft-delete path.
+productsRouter.delete('/:id', requireAdmin, async (req, res) => {
+  const orderCount = await db.query.orders.findFirst({
+    where: eq(schema.orders.productId, req.params.id),
+    columns: { id: true },
+  });
+  if (orderCount) {
+    return res.status(409).json({
+      error: 'product has existing orders — deactivate it instead of deleting',
+    });
+  }
+  const [row] = await db.delete(schema.products).where(eq(schema.products.id, req.params.id)).returning();
+  if (!row) return res.status(404).json({ error: 'product not found' });
+  res.json({ ok: true });
+});
+
 productsRouter.post('/:id/token', requireAdmin, async (req, res) => {
   const tokenId = BigInt(req.body?.tokenId);
   const [row] = await db

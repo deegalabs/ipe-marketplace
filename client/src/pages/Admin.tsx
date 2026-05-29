@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePublicClient, useWriteContract } from 'wagmi';
 import { formatUnits, parseUnits, decodeEventLog, type Hex } from 'viem';
 import { IpeMarketAbi } from '@ipe/shared';
 import { usePrivy } from '@privy-io/react-auth';
-import { api, type ProductDTO, type OrderDTO, type AdminUserDTO } from '../api';
+import { api, type ProductDTO, type OrderDTO, type AdminUserDTO, type EventDTO } from '../api';
 import { env } from '../config';
 import { formatToken, formatBrl } from '../lib/format';
 import { normalizeImageUrl } from '../lib/imageUrl';
@@ -12,28 +12,60 @@ import { useToast } from '../lib/toast';
 import { useConfirm } from '../lib/confirm';
 import { SkeletonBox, SkeletonText } from '../components/Skeleton';
 import { InstallPosterModal } from '../components/InstallPosterModal';
+import { Modal } from '../components/Modal';
 import {
   PlusIcon, PencilIcon, SignOutIcon, PrinterIcon, UploadIcon, RefreshIcon,
   TruckIcon, PackageCheckIcon, UserCheckIcon, UserOffIcon, TrashIcon, SpinnerIcon,
 } from '../components/AdminIcons';
 
+type Tab = 'products' | 'orders' | 'events' | 'treasury' | 'admins';
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'products', label: 'Products' },
+  { id: 'orders', label: 'Orders' },
+  { id: 'events', label: 'Events' },
+  { id: 'treasury', label: 'Treasury' },
+  { id: 'admins', label: 'Admins' },
+];
+
+/// Treasury is only meaningful when contracts are deployed. In gateway-only
+/// deploys we hide the tab entirely to reduce clutter.
+const TREASURY_AVAILABLE =
+  !!env.ipeMarket && env.ipeMarket !== '0x0000000000000000000000000000000000000000';
+
+function visibleTabs(): typeof TABS {
+  return TABS.filter((t) => t.id !== 'treasury' || TREASURY_AVAILABLE);
+}
+
+/// Persist the active tab in the URL (?tab=orders) so refresh/back navigation
+/// doesn't lose context and admins can deep-link a tab.
+function useTabFromUrl(): [Tab, (t: Tab) => void] {
+  const initial = (() => {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get('tab') as Tab | null;
+    return t && visibleTabs().some((v) => v.id === t) ? t : 'products';
+  })();
+  const [tab, setTab] = useState<Tab>(initial);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.set('tab', tab);
+    const url = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
+    window.history.replaceState(null, '', url);
+  }, [tab]);
+  return [tab, setTab];
+}
+
 export function Admin() {
   const { user, logout } = usePrivy();
   const [posterOpen, setPosterOpen] = useState(false);
+  const [tab, setTab] = useTabFromUrl();
   const meQ = useQuery({ queryKey: ['admin-me'], queryFn: api.adminMe });
-  const treasuryQ = useQuery({
-    queryKey: ['treasury'],
-    queryFn: api.treasury,
-    refetchInterval: 30_000,
-    // Treasury fetch hits chain — gracefully missing if contracts aren't deployed.
-    retry: false,
-  });
   const productsQ = useQuery({ queryKey: ['products'], queryFn: api.listProducts });
   const ordersQ = useQuery({ queryKey: ['admin-orders'], queryFn: api.adminOrders });
 
   return (
-    <section className="space-y-10">
-      <header className="flex items-start justify-between gap-3">
+    <section className="space-y-6">
+      <header className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold text-ipe-green">Admin</h1>
           <p className="text-sm text-ipe-ink/60">
@@ -50,18 +82,57 @@ export function Admin() {
         </div>
       </header>
 
-      <TreasuryCard data={treasuryQ.data} loading={treasuryQ.isLoading} />
-      <ProductsCard products={productsQ.data ?? []} loading={productsQ.isLoading} />
-      <OrdersCard orders={ordersQ.data ?? []} products={productsQ.data ?? []} loading={ordersQ.isLoading} />
-      <AdminsCard currentAdminId={meQ.data?.adminId} />
+      <TabBar tab={tab} onChange={setTab} />
+
+      {tab === 'products' && <ProductsCard products={productsQ.data ?? []} loading={productsQ.isLoading} />}
+      {tab === 'orders' && <OrdersCard orders={ordersQ.data ?? []} products={productsQ.data ?? []} loading={ordersQ.isLoading} />}
+      {tab === 'events' && <EventsCard />}
+      {tab === 'treasury' && TREASURY_AVAILABLE && <TreasuryCard />}
+      {tab === 'admins' && <AdminsCard currentAdminId={meQ.data?.adminId} />}
 
       {posterOpen && <InstallPosterModal onClose={() => setPosterOpen(false)} />}
     </section>
   );
 }
 
-function TreasuryCard({ data, loading }: { data: Awaited<ReturnType<typeof api.treasury>> | undefined; loading: boolean }) {
-  if (loading && !data) {
+function TabBar({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
+  return (
+    <div className="border-b border-ipe-stone-200 dark:border-ipe-navy-500/30 overflow-x-auto">
+      <nav className="flex gap-1 min-w-max" role="tablist">
+        {visibleTabs().map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={active}
+              onClick={() => onChange(t.id)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                active
+                  ? 'border-ipe-gold text-ipe-green-700 dark:text-ipe-cream-100'
+                  : 'border-transparent text-ipe-ink/60 hover:text-ipe-ink hover:border-ipe-stone-300'
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
+
+// ─── Treasury ──────────────────────────────────────────────────────────────
+
+function TreasuryCard() {
+  const treasuryQ = useQuery({
+    queryKey: ['treasury'],
+    queryFn: api.treasury,
+    refetchInterval: 30_000,
+    retry: false,
+  });
+
+  if (treasuryQ.isLoading && !treasuryQ.data) {
     return (
       <div className="card p-5 space-y-3">
         <SkeletonBox className="h-7 w-32" />
@@ -78,7 +149,9 @@ function TreasuryCard({ data, loading }: { data: Awaited<ReturnType<typeof api.t
       </div>
     );
   }
-  if (!data) return null;
+  if (!treasuryQ.data) return <p className="text-sm text-ipe-ink/60">Treasury data unavailable.</p>;
+
+  const data = treasuryQ.data;
   const fmt = (b: { symbol: string; decimals: number; balance: string }) =>
     `${(Number(b.balance) / 10 ** b.decimals).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${b.symbol}`;
   return (
@@ -86,39 +159,39 @@ function TreasuryCard({ data, loading }: { data: Awaited<ReturnType<typeof api.t
       <h2 className="text-xl font-semibold text-ipe-green mb-3">Treasury</h2>
       <p className="text-xs text-ipe-ink/60 font-mono break-all mb-3">{data.treasuryAddress}</p>
       <div className="table-wrap">
-      <table className="w-full text-sm">
-        <thead className="text-left text-ipe-ink/60">
-          <tr><th>Token</th><th>Treasury</th><th>In contract (orphan)</th></tr>
-        </thead>
-        <tbody>
-          {[...new Set(data.balances.map((b) => b.symbol))].map((sym) => {
-            const t = data.balances.find((b) => b.symbol === sym && b.location === 'treasury');
-            const c = data.balances.find((b) => b.symbol === sym && b.location === 'contract');
-            return (
-              <tr key={sym} className="border-t border-ipe-green/10">
-                <td className="py-2 font-medium">{sym}</td>
-                <td>{t ? fmt(t) : '—'}</td>
-                <td>{c ? fmt(c) : '—'}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+        <table className="w-full text-sm">
+          <thead className="text-left text-ipe-ink/60">
+            <tr><th>Token</th><th>Treasury</th><th title="Tokens sitting in the marketplace contract — usually 0 unless a buyer paid without us forwarding to treasury yet.">In contract</th></tr>
+          </thead>
+          <tbody>
+            {[...new Set(data.balances.map((b) => b.symbol))].map((sym) => {
+              const t = data.balances.find((b) => b.symbol === sym && b.location === 'treasury');
+              const c = data.balances.find((b) => b.symbol === sym && b.location === 'contract');
+              return (
+                <tr key={sym} className="border-t border-ipe-green/10">
+                  <td className="py-2 font-medium">{sym}</td>
+                  <td>{t ? fmt(t) : '—'}</td>
+                  <td>{c ? fmt(c) : '—'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
+
+// ─── Products ─────────────────────────────────────────────────────────────
 
 interface ProductDraft {
   name: string;
   description: string;
   category: 't-shirt' | 'hoodie' | 'cup' | 'cap' | 'other';
   imageUrl: string;
-  /// Single canonical price in USD (human input, e.g. "29.90"). Stored as
-  /// priceUsdc on save; PIX/BRL conversion happens live at checkout via the
-  /// rates endpoint, so admins don't have to maintain three numbers.
   priceUsd: string;
   maxSupply: string;
+  /// Stored as basis points (500 = 5%). Form input uses % for usability.
   royaltyBps: number;
   physicalStock: number;
   pickupAvailable: boolean;
@@ -160,13 +233,10 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
   const toast = useToast();
   const confirm = useConfirm();
   const [busyId, setBusyId] = useState<string | null>(null);
-  /// null = closed, 'new' = creating, '<uuid>' = editing that product
   const [editing, setEditing] = useState<string | 'new' | null>(null);
 
-  /// Soft-delete via `active=false` so the product disappears from the public
-  /// shop without breaking historical orders' foreign keys. Reversible.
   async function setActive(p: ProductDTO, active: boolean) {
-    if (active === false) {
+    if (!active) {
       const ok = await confirm({
         title: 'Deactivate product?',
         body: <>Hide <strong>{p.name}</strong> from the public shop. Existing orders are preserved and the product can be reactivated anytime.</>,
@@ -182,6 +252,26 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
       toast.success(active ? 'Product activated' : 'Product deactivated', p.name);
     } catch (err) {
       toast.error('Update failed', err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deleteProduct(p: ProductDTO) {
+    const ok = await confirm({
+      title: 'Delete this product?',
+      body: <>Permanently delete <strong>{p.name}</strong>. Only works if there are no orders for it; otherwise use Deactivate.</>,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    setBusyId(p.id);
+    try {
+      await api.deleteProduct(p.id);
+      await qc.invalidateQueries({ queryKey: ['products'] });
+      toast.success('Product deleted', p.name);
+    } catch (err) {
+      toast.error('Delete failed', err instanceof Error ? err.message : String(err));
     } finally {
       setBusyId(null);
     }
@@ -228,8 +318,6 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
     }
   }
 
-  /// Push the off-chain price for a single token to the contract via setPrice.
-  /// Reads the current DB value (in smallest unit) and sends it. Owner-only onchain.
   async function syncPriceOnchain(p: ProductDTO, token: 'ipe' | 'usdc') {
     if (!publicClient || !p.tokenId) return;
     const tokenAddr = token === 'ipe' ? env.ipeToken : env.usdcToken;
@@ -251,117 +339,111 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
     }
   }
 
+  const editingProduct = editing && editing !== 'new' ? products.find((p) => p.id === editing) : null;
+
   return (
     <div className="card p-5">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xl font-semibold text-ipe-green">Products</h2>
-        {editing === null && (
-          <button className="action-btn-primary" onClick={() => setEditing('new')}>
-            <PlusIcon /> New product
-          </button>
-        )}
+        <button className="action-btn-primary" onClick={() => setEditing('new')}>
+          <PlusIcon /> New product
+        </button>
       </div>
 
       {loading && products.length === 0 && <TableRowsSkeleton rows={3} cols={5} />}
-
-      {editing !== null && (
-        <ProductForm
-          mode={editing === 'new' ? 'new' : 'edit'}
-          initial={editing === 'new' ? EMPTY_DRAFT : draftFromProduct(products.find((p) => p.id === editing)!)}
-          targetId={editing === 'new' ? null : editing}
-          onClose={() => setEditing(null)}
-          onSaved={async () => {
-            await qc.invalidateQueries({ queryKey: ['products'] });
-            setEditing(null);
-          }}
-        />
+      {!loading && products.length === 0 && (
+        <p className="text-sm text-ipe-ink/60 py-4">No products yet. Click <strong>New product</strong> to add one.</p>
       )}
 
-      {/* Mobile: stacked cards. Desktop: table. */}
+      {/* Mobile cards */}
       <ul className="sm:hidden space-y-3 mt-4">
         {products.map((p) => (
           <li key={p.id} className="border border-ipe-green/10 rounded-md p-3">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="font-medium">{p.name}</p>
-                <p className="text-xs text-ipe-ink/60">
-                  {p.tokenId ? <span className="text-green-700">onchain #{p.tokenId}</span> : <span className="text-amber-700">offline</span>}
-                  {' · stock '}{p.physicalStock}{p.active ? '' : ' · inactive'}
+                <p className="text-xs text-ipe-ink/60 mt-0.5">
+                  {!p.active && <span className="text-red-600 mr-1">inactive</span>}
+                  {p.physicalStock === 0 ? <span className="text-amber-700">sold out</span> : `stock ${p.physicalStock}`}
+                  {p.tokenId && <span className="text-green-700 ml-1">· onchain #{p.tokenId}</span>}
                 </p>
               </div>
+              <p className="text-sm font-mono tabular-nums shrink-0">
+                {BigInt(p.priceUsdc) > 0n ? `$${(Number(p.priceUsdc) / 1e6).toFixed(2)}` : '—'}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3">
               <button className="action-btn-ghost" onClick={() => setEditing(p.id)} disabled={busyId === p.id}>
                 <PencilIcon /> Edit
               </button>
-            </div>
-            <p className="text-sm mt-2">
-              <span className="text-ipe-ink/50 text-xs uppercase tracking-wider mr-1">USD</span>
-              {BigInt(p.priceUsdc) > 0n ? `$${(Number(p.priceUsdc) / 1e6).toFixed(2)}` : '—'}
-            </p>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {!p.tokenId && (
-                <button className="action-btn-primary" disabled={busyId === p.id} onClick={() => pushOnchain(p)}>
-                  {busyId === p.id ? <><SpinnerIcon /> Pushing…</> : <><UploadIcon /> Push onchain</>}
-                </button>
-              )}
-              {p.tokenId && BigInt(p.priceUsdc) > 0n && (
-                <button className="action-btn-ghost" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'usdc')}>
-                  <RefreshIcon /> Sync USDC
-                </button>
-              )}
               <button
-                className={p.active ? 'action-btn-destructive' : 'action-btn-primary'}
+                className={p.active ? 'action-btn-ghost' : 'action-btn-primary'}
                 disabled={busyId === p.id}
                 onClick={() => setActive(p, !p.active)}
               >
                 {p.active ? <><UserOffIcon /> Deactivate</> : <><UserCheckIcon /> Reactivate</>}
               </button>
+              <button className="action-btn-destructive" disabled={busyId === p.id} onClick={() => deleteProduct(p)}>
+                <TrashIcon /> Delete
+              </button>
             </div>
+            <details className="mt-2">
+              <summary className="text-xs text-ipe-ink/50 cursor-pointer">Onchain actions</summary>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {!p.tokenId && (
+                  <button className="action-btn-ghost" disabled={busyId === p.id} onClick={() => pushOnchain(p)}>
+                    {busyId === p.id ? <><SpinnerIcon /> Pushing…</> : <><UploadIcon /> Push onchain</>}
+                  </button>
+                )}
+                {p.tokenId && BigInt(p.priceUsdc) > 0n && (
+                  <button className="action-btn-ghost" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'usdc')}>
+                    <RefreshIcon /> Sync USDC price
+                  </button>
+                )}
+              </div>
+            </details>
           </li>
         ))}
       </ul>
 
+      {/* Desktop table */}
       <div className="hidden sm:block table-wrap mt-4">
         <table className="w-full text-sm">
           <thead className="text-left text-ipe-ink/60">
             <tr>
               <th className="py-2">Product</th>
-              <th>Onchain</th>
               <th>Price (USD)</th>
               <th>Stock</th>
-              <th>Active</th>
+              <th>Status</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {products.map((p) => (
               <tr key={p.id} className="border-t border-ipe-green/10">
-                <td className="py-2">{p.name}</td>
-                <td>{p.tokenId ? <span className="text-green-700">#{p.tokenId}</span> : <span className="text-amber-700">offline</span>}</td>
+                <td className="py-2">
+                  <div className="font-medium">{p.name}</div>
+                  {p.tokenId && <div className="text-2xs text-green-700">onchain #{p.tokenId}</div>}
+                </td>
                 <td>{BigInt(p.priceUsdc) > 0n ? `$${(Number(p.priceUsdc) / 1e6).toFixed(2)}` : '—'}</td>
-                <td>{p.physicalStock}</td>
-                <td>{p.active ? '✓' : '—'}</td>
+                <td>{p.physicalStock === 0 ? <span className="text-amber-700 font-medium">sold out</span> : p.physicalStock}</td>
+                <td>{p.active ? <span className="text-green-700">active</span> : <span className="text-red-600">inactive</span>}</td>
                 <td className="whitespace-nowrap">
-                  <div className="inline-flex flex-wrap items-center gap-2">
+                  <div className="inline-flex flex-wrap items-center gap-1.5">
                     <button className="action-btn-ghost" onClick={() => setEditing(p.id)} disabled={busyId === p.id}>
                       <PencilIcon /> Edit
                     </button>
-                    {!p.tokenId && (
-                      <button className="action-btn-primary" disabled={busyId === p.id} onClick={() => pushOnchain(p)}>
-                        {busyId === p.id ? <><SpinnerIcon /> Pushing…</> : <><UploadIcon /> Push</>}
-                      </button>
-                    )}
-                    {p.tokenId && BigInt(p.priceUsdc) > 0n && (
-                      <button className="action-btn-ghost" disabled={busyId === p.id} onClick={() => syncPriceOnchain(p, 'usdc')}>
-                        <RefreshIcon /> Sync
-                      </button>
-                    )}
                     <button
-                      className={p.active ? 'action-btn-destructive' : 'action-btn-primary'}
+                      className={p.active ? 'action-btn-ghost' : 'action-btn-primary'}
                       disabled={busyId === p.id}
                       onClick={() => setActive(p, !p.active)}
                     >
                       {p.active ? <><UserOffIcon /> Deactivate</> : <><UserCheckIcon /> Reactivate</>}
                     </button>
+                    <button className="action-btn-destructive" disabled={busyId === p.id} onClick={() => deleteProduct(p)}>
+                      <TrashIcon /> Delete
+                    </button>
+                    <OnchainMenu p={p} busy={busyId === p.id} onPush={() => pushOnchain(p)} onSync={() => syncPriceOnchain(p, 'usdc')} />
                   </div>
                 </td>
               </tr>
@@ -369,6 +451,71 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
           </tbody>
         </table>
       </div>
+
+      {editing !== null && (
+        <Modal
+          title={editing === 'new' ? 'New product' : `Edit · ${editingProduct?.name ?? 'product'}`}
+          onClose={() => setEditing(null)}
+        >
+          {/* `key` forces fresh state when switching between products. */}
+          <ProductForm
+            key={editing}
+            mode={editing === 'new' ? 'new' : 'edit'}
+            initial={editing === 'new' ? EMPTY_DRAFT : draftFromProduct(editingProduct!)}
+            targetId={editing === 'new' ? null : editing}
+            onClose={() => setEditing(null)}
+            onSaved={async () => {
+              await qc.invalidateQueries({ queryKey: ['products'] });
+              setEditing(null);
+            }}
+          />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function OnchainMenu({ p, busy, onPush, onSync }: { p: ProductDTO; busy: boolean; onPush: () => void; onSync: () => void }) {
+  const [open, setOpen] = useState(false);
+  // Only show when there's something meaningful to do.
+  const canPush = !p.tokenId;
+  const canSync = !!p.tokenId && BigInt(p.priceUsdc) > 0n;
+  if (!canPush && !canSync) return null;
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        className="action-btn-ghost"
+        onClick={() => setOpen((v) => !v)}
+        disabled={busy}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        Onchain ▾
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-1 z-20 min-w-[180px] bg-white dark:bg-ipe-navy-800 border border-ipe-stone-200 dark:border-ipe-navy-500/30 rounded-md shadow-lg py-1 text-sm">
+            {canPush && (
+              <button
+                className="w-full text-left px-3 py-2 hover:bg-ipe-stone-50 dark:hover:bg-ipe-navy-700 flex items-center gap-2"
+                onClick={() => { setOpen(false); onPush(); }}
+              >
+                <UploadIcon /> Push onchain
+              </button>
+            )}
+            {canSync && (
+              <button
+                className="w-full text-left px-3 py-2 hover:bg-ipe-stone-50 dark:hover:bg-ipe-navy-700 flex items-center gap-2"
+                onClick={() => { setOpen(false); onSync(); }}
+              >
+                <RefreshIcon /> Sync USDC price
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -376,7 +523,6 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
 interface ProductFormProps {
   mode: 'new' | 'edit';
   initial: ProductDraft;
-  /// product UUID when editing, null when creating
   targetId: string | null;
   onClose: () => void;
   onSaved: () => void | Promise<void>;
@@ -425,60 +571,145 @@ function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormP
     }
   }
 
-  return (
-    <div className="border border-ipe-green/20 rounded-md p-4 bg-ipe-green/5">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-medium text-ipe-green">{mode === 'new' ? 'New product' : 'Edit product'}</h3>
-        <button className="text-xs text-ipe-ink/60 hover:text-ipe-ink" onClick={onClose}>cancel</button>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <input className="input" placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-        <ImageUrlField value={draft.imageUrl} onChange={(v) => setDraft({ ...draft, imageUrl: v })} />
-        <input className="input sm:col-span-2" placeholder="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
-        <select className="input" value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value as ProductDraft['category'] })}>
-          <option value="t-shirt">t-shirt</option>
-          <option value="hoodie">hoodie</option>
-          <option value="cup">cup</option>
-          <option value="cap">cap</option>
-          <option value="other">other</option>
-        </select>
-        <input className="input" placeholder="Max supply (0 = ∞)" value={draft.maxSupply} onChange={(e) => setDraft({ ...draft, maxSupply: e.target.value })} />
+  /// Royalty is stored as bps onchain (500 = 5%). Show it as % in the form
+  /// so admins don't need to know what "bps" means.
+  const royaltyPct = draft.royaltyBps / 100;
 
-        <div className="sm:col-span-2">
-          <label className="label">Price (USD)</label>
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Name" required full>
+          <input
+            className="input"
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+            placeholder="e.g. Ipê Tee — Green"
+          />
+        </Field>
+
+        <Field label="Image URL" full>
+          <ImageUrlField value={draft.imageUrl} onChange={(v) => setDraft({ ...draft, imageUrl: v })} />
+        </Field>
+
+        <Field label="Description" full>
+          <textarea
+            className="input min-h-[80px]"
+            value={draft.description}
+            onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+            placeholder="Short description shown on the product page."
+          />
+        </Field>
+
+        <Field label="Category">
+          <select
+            className="input"
+            value={draft.category}
+            onChange={(e) => setDraft({ ...draft, category: e.target.value as ProductDraft['category'] })}
+          >
+            <option value="t-shirt">T-shirt</option>
+            <option value="hoodie">Hoodie</option>
+            <option value="cup">Cup</option>
+            <option value="cap">Cap</option>
+            <option value="other">Other</option>
+          </select>
+        </Field>
+
+        <Field label="Price (USD)" required hint="One canonical USD price. PIX converts to BRL live at checkout.">
           <input
             className="input"
             type="number"
             step="0.01"
+            min="0"
             placeholder="29.90"
             value={draft.priceUsd}
             onChange={(e) => setDraft({ ...draft, priceUsd: e.target.value })}
           />
-          <p className="text-[11px] text-ipe-ink-50 mt-1">
-            One canonical price. Crypto pays at this USDC amount; PIX is converted to BRL live at checkout via CoinGecko.
-          </p>
-        </div>
+        </Field>
 
-        <input className="input" type="number" placeholder="Royalty bps" value={draft.royaltyBps} onChange={(e) => setDraft({ ...draft, royaltyBps: Number(e.target.value) })} />
-        <input className="input" type="number" placeholder="Physical stock" value={draft.physicalStock} onChange={(e) => setDraft({ ...draft, physicalStock: Number(e.target.value) })} />
+        <Field label="Physical stock" hint="0 = sold out (shown as a badge in the shop).">
+          <input
+            className="input"
+            type="number"
+            min="0"
+            value={draft.physicalStock}
+            onChange={(e) => setDraft({ ...draft, physicalStock: Number(e.target.value) })}
+          />
+        </Field>
 
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={draft.shippingAvailable} onChange={(e) => setDraft({ ...draft, shippingAvailable: e.target.checked })} />
-          Allow shipping
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={draft.pickupAvailable} onChange={(e) => setDraft({ ...draft, pickupAvailable: e.target.checked })} />
-          Allow event pickup
-        </label>
+        <Field label="Max supply" hint="0 = unlimited. Onchain mint cap.">
+          <input
+            className="input"
+            type="number"
+            min="0"
+            value={draft.maxSupply}
+            onChange={(e) => setDraft({ ...draft, maxSupply: e.target.value })}
+          />
+        </Field>
 
-        {error && <p className="sm:col-span-2 text-sm text-red-700">{error}</p>}
-        <button className="btn-primary sm:col-span-2" onClick={save} disabled={saving}>
-          {saving ? 'Saving…' : mode === 'new' ? 'Create product' : 'Save changes'}
+        <Field label="Royalty (%)" hint="Secondary-market royalty paid to treasury. 5% is standard.">
+          <input
+            className="input"
+            type="number"
+            step="0.1"
+            min="0"
+            max="100"
+            value={royaltyPct}
+            onChange={(e) => setDraft({ ...draft, royaltyBps: Math.round(Number(e.target.value) * 100) })}
+          />
+        </Field>
+
+        <Field label="Delivery options" full>
+          <div className="flex gap-4 pt-1">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={draft.pickupAvailable}
+                onChange={(e) => setDraft({ ...draft, pickupAvailable: e.target.checked })}
+              />
+              Allow event pickup
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={draft.shippingAvailable}
+                onChange={(e) => setDraft({ ...draft, shippingAvailable: e.target.checked })}
+              />
+              Allow shipping
+            </label>
+          </div>
+        </Field>
+      </div>
+
+      {error && <p className="text-sm text-red-700">{error}</p>}
+
+      <div className="flex items-center justify-end gap-2 pt-2 border-t border-ipe-stone-200 dark:border-ipe-navy-500/30">
+        <button type="button" className="action-btn-ghost" onClick={onClose} disabled={saving}>
+          Cancel
+        </button>
+        <button className="action-btn-primary" onClick={save} disabled={saving}>
+          {saving ? <><SpinnerIcon /> Saving…</> : (mode === 'new' ? 'Create product' : 'Save changes')}
         </button>
       </div>
     </div>
   );
 }
+
+/// Form field wrapper — adds an explicit label + optional hint. `full` makes
+/// it span both columns in the 2-col grid. `required` adds a red asterisk.
+function Field({ label, hint, required, full, children }: { label: string; hint?: string; required?: boolean; full?: boolean; children: React.ReactNode }) {
+  return (
+    <div className={full ? 'sm:col-span-2' : ''}>
+      <label className="label">
+        {label}
+        {required && <span className="text-red-600 ml-0.5">*</span>}
+      </label>
+      {children}
+      {hint && <p className="text-[11px] text-ipe-ink-50 mt-1">{hint}</p>}
+    </div>
+  );
+}
+
+// ─── Orders ────────────────────────────────────────────────────────────────
 
 function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; products: ProductDTO[]; loading: boolean }) {
   const qc = useQueryClient();
@@ -529,7 +760,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
         <p className="text-ipe-ink/60 text-sm">No orders yet.</p>
       ) : (
         <>
-          {/* Mobile: stacked cards */}
+          {/* Mobile cards */}
           <ul className="sm:hidden space-y-3">
             {orders.map((o) => {
               const p = productById.get(o.productId);
@@ -550,7 +781,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                     {o.deliveryMethod === 'shipping' && addr
                       ? `→ ${addr.line1}, ${addr.city} (${addr.country})`
                       : o.deliveryMethod === 'pickup' && o.pickup
-                        ? `pickup @ ${o.pickup.eventId}${o.pickup.displayName ? ` (${o.pickup.displayName})` : ''}`
+                        ? `pickup @ ${o.pickup.eventId}`
                         : '—'}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -575,6 +806,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
             })}
           </ul>
 
+          {/* Desktop table */}
           <div className="hidden sm:block table-wrap">
             <table className="w-full text-sm">
               <thead className="text-left text-ipe-ink/60">
@@ -604,10 +836,10 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                         {o.deliveryMethod === 'shipping' && addr
                           ? `→ ${addr.line1}, ${addr.city} (${addr.country})`
                           : o.deliveryMethod === 'pickup' && o.pickup
-                            ? `pickup @ ${o.pickup.eventId}${o.pickup.displayName ? ` (${o.pickup.displayName})` : ''}`
+                            ? `pickup @ ${o.pickup.eventId}`
                             : '—'}
                       </td>
-                      <td>{o.status}</td>
+                      <td><span className={`text-xs px-2 py-0.5 rounded ${badgeForStatus(o.status)}`}>{o.status}</span></td>
                       <td>
                         <div className="flex flex-wrap gap-1">
                           {o.status === 'paid' && (
@@ -651,8 +883,261 @@ function badgeForStatus(s: string) {
   }
 }
 
-/// Image URL input that previews the resolved image and accepts Google Drive
-/// share links (auto-rewritten to googleusercontent thumbnails).
+// ─── Events ────────────────────────────────────────────────────────────────
+
+interface EventDraft {
+  slug: string;
+  name: string;
+  date: string;       // datetime-local value (YYYY-MM-DDTHH:mm)
+  location: string;
+  active: boolean;
+}
+
+const EMPTY_EVENT: EventDraft = { slug: '', name: '', date: '', location: '', active: true };
+
+function EventsCard() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const eventsQ = useQuery({ queryKey: ['events-admin'], queryFn: api.adminListEvents });
+  const [editing, setEditing] = useState<string | 'new' | null>(null);
+  const events = eventsQ.data ?? [];
+
+  async function remove(e: EventDTO) {
+    const ok = await confirm({
+      title: 'Delete event?',
+      body: <>Permanently remove <strong>{e.name}</strong>. Existing orders that referenced this event keep their slug, but the dropdown won't show it anymore.</>,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await api.deleteEvent(e.id);
+      await qc.invalidateQueries({ queryKey: ['events-admin'] });
+      await qc.invalidateQueries({ queryKey: ['events'] });
+      toast.success('Event deleted', e.name);
+    } catch (err) {
+      toast.error('Delete failed', err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function toggle(e: EventDTO) {
+    try {
+      await api.updateEvent(e.id, { active: !e.active });
+      await qc.invalidateQueries({ queryKey: ['events-admin'] });
+      await qc.invalidateQueries({ queryKey: ['events'] });
+      toast.success(e.active ? 'Event hidden' : 'Event reactivated', e.name);
+    } catch (err) {
+      toast.error('Update failed', err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  const editingEvent = editing && editing !== 'new' ? events.find((e) => e.id === editing) : null;
+
+  return (
+    <div className="card p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h2 className="text-xl font-semibold text-ipe-green">Events</h2>
+          <p className="text-xs text-ipe-ink/60 mt-1">
+            Active events show as a dropdown in the buyer's pickup form. Add the next meetup so buyers don't have to guess the slug.
+          </p>
+        </div>
+        <button className="action-btn-primary" onClick={() => setEditing('new')}>
+          <PlusIcon /> New event
+        </button>
+      </div>
+
+      {eventsQ.isLoading && events.length === 0 && <TableRowsSkeleton rows={2} cols={4} />}
+      {!eventsQ.isLoading && events.length === 0 && (
+        <p className="text-sm text-ipe-ink/60 py-4">No events yet. Add one so buyers can pick a pickup location.</p>
+      )}
+
+      <ul className="divide-y divide-ipe-green/10">
+        {events.map((e) => (
+          <li key={e.id} className="py-3 flex items-start justify-between gap-3 text-sm">
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">{e.name}</p>
+              <p className="text-xs text-ipe-ink/60 mt-0.5">
+                <span className="font-mono">{e.slug}</span> · {new Date(e.date).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                {e.location && <> · 📍 {e.location}</>}
+                {!e.active && <span className="text-red-600 ml-2">inactive</span>}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button className="action-btn-ghost" onClick={() => setEditing(e.id)}>
+                <PencilIcon /> Edit
+              </button>
+              <button
+                className={e.active ? 'action-btn-ghost' : 'action-btn-primary'}
+                onClick={() => toggle(e)}
+              >
+                {e.active ? <><UserOffIcon /> Hide</> : <><UserCheckIcon /> Show</>}
+              </button>
+              <button className="action-btn-destructive" onClick={() => remove(e)}>
+                <TrashIcon /> Delete
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {editing !== null && (
+        <Modal
+          title={editing === 'new' ? 'New event' : `Edit · ${editingEvent?.name ?? 'event'}`}
+          onClose={() => setEditing(null)}
+        >
+          <EventForm
+            key={editing}
+            mode={editing === 'new' ? 'new' : 'edit'}
+            initial={editing === 'new' ? EMPTY_EVENT : eventDraftFrom(editingEvent!)}
+            targetId={editing === 'new' ? null : editing}
+            onClose={() => setEditing(null)}
+            onSaved={async () => {
+              await qc.invalidateQueries({ queryKey: ['events-admin'] });
+              await qc.invalidateQueries({ queryKey: ['events'] });
+              setEditing(null);
+            }}
+          />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function eventDraftFrom(e: EventDTO): EventDraft {
+  // Convert ISO → datetime-local format (YYYY-MM-DDTHH:mm) in local TZ.
+  const d = new Date(e.date);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return { slug: e.slug, name: e.name, date: local, location: e.location, active: e.active };
+}
+
+function EventForm({
+  mode, initial, targetId, onClose, onSaved,
+}: {
+  mode: 'new' | 'edit';
+  initial: EventDraft;
+  targetId: string | null;
+  onClose: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  const toast = useToast();
+  const [draft, setDraft] = useState<EventDraft>(initial);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    if (!draft.slug.match(/^[a-z0-9-]{2,}$/)) {
+      setError('Slug must be lowercase letters, digits or hyphens (e.g. "ipe-demo-day-2026").');
+      return;
+    }
+    if (!draft.name.trim() || !draft.date) {
+      setError('Name and date are required.');
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      const dateISO = new Date(draft.date).toISOString();
+      if (mode === 'new') {
+        await api.createEvent({
+          slug: draft.slug.trim(),
+          name: draft.name.trim(),
+          date: dateISO,
+          location: draft.location.trim() || undefined,
+          active: draft.active,
+        });
+        toast.success('Event created', draft.name);
+      } else {
+        await api.updateEvent(targetId!, {
+          name: draft.name.trim(),
+          date: dateISO,
+          location: draft.location.trim(),
+          active: draft.active,
+        });
+        toast.success('Event updated', draft.name);
+      }
+      await onSaved();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'save failed';
+      setError(msg);
+      toast.error('Could not save event', msg);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Slug" required hint="URL-safe ID stored on orders. Cannot be changed after creation." full={mode === 'edit'}>
+          <input
+            className="input font-mono"
+            value={draft.slug}
+            onChange={(e) => setDraft({ ...draft, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
+            placeholder="ipe-demo-day-2026"
+            disabled={mode === 'edit'}
+          />
+        </Field>
+
+        {mode === 'new' && <div />}
+
+        <Field label="Name" required full>
+          <input
+            className="input"
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+            placeholder="Ipê Demo Day 2026"
+          />
+        </Field>
+
+        <Field label="Date & time" required>
+          <input
+            className="input"
+            type="datetime-local"
+            value={draft.date}
+            onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+          />
+        </Field>
+
+        <Field label="Location" hint="Optional — shown to buyers under the dropdown.">
+          <input
+            className="input"
+            value={draft.location}
+            onChange={(e) => setDraft({ ...draft, location: e.target.value })}
+            placeholder="São Paulo, BR"
+          />
+        </Field>
+
+        <Field label="Visibility" full>
+          <label className="flex items-center gap-2 text-sm pt-1">
+            <input
+              type="checkbox"
+              checked={draft.active}
+              onChange={(e) => setDraft({ ...draft, active: e.target.checked })}
+            />
+            Active — show in pickup dropdown
+          </label>
+        </Field>
+      </div>
+
+      {error && <p className="text-sm text-red-700">{error}</p>}
+
+      <div className="flex items-center justify-end gap-2 pt-2 border-t border-ipe-stone-200 dark:border-ipe-navy-500/30">
+        <button type="button" className="action-btn-ghost" onClick={onClose} disabled={saving}>
+          Cancel
+        </button>
+        <button className="action-btn-primary" onClick={save} disabled={saving}>
+          {saving ? <><SpinnerIcon /> Saving…</> : (mode === 'new' ? 'Create event' : 'Save changes')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Image URL field ──────────────────────────────────────────────────────
+
 function ImageUrlField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const resolved = value ? normalizeImageUrl(value, 256) : '';
   const isDrive = resolved !== value.trim() && !!value;
@@ -691,7 +1176,7 @@ function ImageUrlField({ value, onChange }: { value: string; onChange: (v: strin
           </details>
         )}
       </div>
-      <div className="w-16 h-16 rounded border border-ipe-stone-200 dark:border-ipe-navy-500/30 bg-ipe-stone-50 dark:bg-ipe-navy-700/30 overflow-hidden flex items-center justify-center text-[10px] text-ipe-ink-50 shrink-0">
+      <div className="w-20 h-20 rounded border border-ipe-stone-200 dark:border-ipe-navy-500/30 bg-ipe-stone-50 dark:bg-ipe-navy-700/30 overflow-hidden flex items-center justify-center text-[10px] text-ipe-ink-50 shrink-0">
         {resolved ? (
           <img
             src={resolved}
@@ -709,9 +1194,8 @@ function ImageUrlField({ value, onChange }: { value: string; onChange: (v: strin
   );
 }
 
-/// Admin allowlist management — add an email and that person can sign into
-/// /admin via Privy. Soft-delete (active=false) hides the row from the gate
-/// without losing history. Self-deactivation is blocked server-side.
+// ─── Admins ────────────────────────────────────────────────────────────────
+
 function AdminsCard({ currentAdminId }: { currentAdminId: string | undefined }) {
   const qc = useQueryClient();
   const toast = useToast();
@@ -846,6 +1330,8 @@ function AdminsCard({ currentAdminId }: { currentAdminId: string | undefined }) 
   );
 }
 
+// ─── Shared utils ─────────────────────────────────────────────────────────
+
 function formatPaid(o: OrderDTO): string {
   switch (o.paymentMethod) {
     case 'ipe': return formatToken(o.totalPaid, 'IPE');
@@ -855,8 +1341,6 @@ function formatPaid(o: OrderDTO): string {
   }
 }
 
-/// Generic table-row skeleton — fills both the mobile stack and desktop table
-/// in admin cards with placeholder bars while data is loading.
 function TableRowsSkeleton({ rows, cols }: { rows: number; cols: number }) {
   return (
     <div className="space-y-2 mt-4">

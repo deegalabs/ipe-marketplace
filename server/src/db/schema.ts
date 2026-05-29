@@ -96,6 +96,22 @@ export const indexerState = pgTable('indexer_state', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/// Active events for pickup. Admin curates this list; the buyer-facing pickup
+/// form shows only `active=true` rows as a dropdown. The slug is what gets
+/// stored on the order (orders.pickupEventId) for backwards compat with the
+/// old free-text field.
+export const events = pgTable('events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  /// URL-safe slug stored on orders (e.g. 'ipe-demo-day-2026').
+  slug: text('slug').notNull().unique(),
+  name: text('name').notNull(),
+  /// When the event happens — used to sort + show in the dropdown.
+  date: timestamp('date', { withTimezone: true }).notNull(),
+  location: text('location').notNull().default(''),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 /// Allowlist of emails that grant admin access. Auth is delegated to Privy:
 /// after verifying the access token, the backend looks up the user's primary
 /// email here. Active = false disables an admin without deleting the row.

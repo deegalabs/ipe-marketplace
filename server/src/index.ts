@@ -9,6 +9,7 @@ import { treasuryRouter } from './routes/treasury.js';
 import { ratesRouter } from './routes/rates.js';
 import { gatewayRouter } from './routes/gateway.js';
 import { adminAuthRouter } from './routes/admin-auth.js';
+import { eventsRouter } from './routes/events.js';
 import { startIndexer } from './indexer.js';
 import { ensureBootstrapAdmin } from './services/auth.js';
 import { startOrderSweeper } from './services/orderSweeper.js';
@@ -72,6 +73,7 @@ app.use('/products', productsRouter);
 app.use('/orders', ordersRouter);
 app.use('/treasury', treasuryRouter);
 app.use('/rates', ratesRouter);
+app.use('/events', eventsRouter);
 app.use('/', gatewayRouter);   // mounts /orders/gateway, /webhooks/*, /orders/gateway/:id/dev-confirm
 
 /// CORS rejections (origin not in allowlist) bubble up as Errors with a

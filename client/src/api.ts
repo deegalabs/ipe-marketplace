@@ -118,6 +118,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ tokenId: tokenId.toString() }),
     }),
+  /// Hard delete. Server returns 409 if there are existing orders referencing this product.
+  deleteProduct: (id: string) =>
+    request<{ ok: true }>(`/products/${id}`, { admin: true, method: 'DELETE' }),
 
   createOrder: (input: CreateOrderInput) =>
     request<OrderDTO>('/orders', { method: 'POST', body: JSON.stringify(input, replacer) }),
@@ -196,7 +199,28 @@ export const api = {
     }),
   removeAdmin: (id: string) =>
     request<AdminUserDTO>(`/admin/admins/${id}`, { admin: true, method: 'DELETE' }),
+
+  /// Pickup events. Public endpoint returns only active events sorted by date;
+  /// admin endpoint returns everything for the management UI.
+  listEvents: () => request<EventDTO[]>('/events'),
+  adminListEvents: () => request<EventDTO[]>('/events/admin', { admin: true }),
+  createEvent: (body: { slug: string; name: string; date: string; location?: string; active?: boolean }) =>
+    request<EventDTO>('/events/admin', { admin: true, method: 'POST', body: JSON.stringify(body) }),
+  updateEvent: (id: string, body: { name?: string; date?: string; location?: string; active?: boolean }) =>
+    request<EventDTO>(`/events/admin/${id}`, { admin: true, method: 'PATCH', body: JSON.stringify(body) }),
+  deleteEvent: (id: string) =>
+    request<{ ok: true }>(`/events/admin/${id}`, { admin: true, method: 'DELETE' }),
 };
+
+export interface EventDTO {
+  id: string;
+  slug: string;
+  name: string;
+  date: string;
+  location: string;
+  active: boolean;
+  createdAt: string;
+}
 
 export interface AdminUserDTO {
   id: string;
