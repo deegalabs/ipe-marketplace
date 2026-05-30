@@ -91,6 +91,7 @@ export interface OrderDTO {
   deliveryMethod: DeliveryMethod;
   shippingAddress: unknown;
   pickup: { eventId: string; displayName?: string } | null;
+  pickupToken: string | null;
   trackingCode: string | null;
   createdAt: string;
 }
@@ -158,6 +159,21 @@ export const api = {
   /// direct orders, just flips status to 'refunded' (refund must be sent manually).
   refundOrder: (id: string) =>
     request<OrderDTO>(`/orders/admin/${id}/refund`, { admin: true, method: 'POST' }),
+
+  /// Pickup scanner — verify a QR token without flipping state.
+  verifyPickup: (token: string) =>
+    request<OrderDTO>('/orders/admin/pickup/verify', {
+      admin: true,
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    }),
+  /// Pickup scanner — verify + atomically flip the order to 'delivered'.
+  confirmPickup: (token: string) =>
+    request<OrderDTO>('/orders/admin/pickup/confirm', {
+      admin: true,
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    }),
 
   /// Gateway checkout (Mercado Pago PIX or NOWPayments crypto-gateway).
   createGatewayOrder: (input: {

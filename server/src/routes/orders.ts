@@ -12,6 +12,7 @@ import {
 } from '../services/email.js';
 import { requireAdmin } from '../middleware/requireAdmin.js';
 import { refundPayment } from '../services/mercadopago.js';
+import { pickupToken, verifyPickupToken } from '../services/pickupToken.js';
 
 export const ordersRouter = Router();
 
@@ -122,6 +123,39 @@ ordersRouter.post('/admin/:id/refund', requireAdmin, async (req, res) => {
   res.json(serializeOrder(updated!, true));
 });
 
+/// Pickup verify — admin scans the buyer's QR at the event.
+/// `POST /orders/admin/pickup/verify` with `{ token }` returns the order DTO
+/// (with PII) so the admin sees product/buyer/event before confirming.
+/// Doesn't change state — just decodes + reads.
+ordersRouter.post('/admin/pickup/verify', requireAdmin, async (req, res) => {
+  const token = String((req.body as { token?: string })?.token ?? '');
+  const orderId = verifyPickupToken(token);
+  if (!orderId) return res.status(400).json({ error: 'invalid or tampered token' });
+  const row = await db.query.orders.findFirst({ where: eq(schema.orders.id, orderId) });
+  if (!row) return res.status(404).json({ error: 'order not found' });
+  res.json(serializeOrder(row, true));
+});
+
+/// Pickup confirm — verify the token AND mark the order as delivered.
+/// Race-safe via the status filter: only flips `paid` → `delivered`. Replays
+/// (admin scans the same QR twice) return 409.
+ordersRouter.post('/admin/pickup/confirm', requireAdmin, async (req, res) => {
+  const token = String((req.body as { token?: string })?.token ?? '');
+  const orderId = verifyPickupToken(token);
+  if (!orderId) return res.status(400).json({ error: 'invalid or tampered token' });
+  const [updated] = await db
+    .update(schema.orders)
+    .set({ status: 'delivered', updatedAt: new Date() })
+    .where(and(eq(schema.orders.id, orderId), eq(schema.orders.status, 'paid')))
+    .returning();
+  if (!updated) {
+    const existing = await db.query.orders.findFirst({ where: eq(schema.orders.id, orderId) });
+    if (!existing) return res.status(404).json({ error: 'order not found' });
+    return res.status(409).json({ error: `order is '${existing.status}', not 'paid'` });
+  }
+  res.json(serializeOrder(updated, true));
+});
+
 /// Public cancel — buyer initiated. Idempotent + race-safe: the UPDATE only
 /// succeeds while the order is still pre-paid, so a webhook landing in the
 /// same millisecond as the cancel will either flip status to 'paid' first
@@ -201,6 +235,10 @@ function serializeOrder(o: typeof schema.orders.$inferSelect, includePII: boolea
     pickup: o.pickupEventId
       ? { eventId: o.pickupEventId, displayName: o.pickupDisplayName ?? '' }
       : null,
+    // HMAC-signed token rendered as a QR for in-person pickup. Only meaningful
+    // for paid pickup orders, but emitted on every row so the buyer can also
+    // re-show it after delivery (for proof / receipt purposes).
+    pickupToken: o.deliveryMethod === 'pickup' ? pickupToken(o.id) : null,
     trackingCode: o.trackingCode,
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,

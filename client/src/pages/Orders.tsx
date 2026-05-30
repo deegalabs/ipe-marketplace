@@ -108,6 +108,19 @@ function OrderRow({ order: o, product }: { order: OrderDTO; product: ProductDTO 
             </div>
           )}
 
+          {/* Pickup ticket — only for paid pickup orders. Buyer taps to open
+              the full-screen QR they'll show at the event. */}
+          {o.deliveryMethod === 'pickup' && o.status === 'paid' && (
+            <div className="mt-3">
+              <Link
+                href={`/orders/${o.id}/pickup`}
+                className="action-btn-primary inline-flex"
+              >
+                <QrIcon /> Show pickup ticket
+              </Link>
+            </div>
+          )}
+
           <TxLink order={o} />
         </div>
       </div>

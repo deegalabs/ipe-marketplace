@@ -51,6 +51,11 @@ export const TrashIcon = () => (
   <Svg><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></Svg>
 );
 export const CloseIcon = () => <Svg><path d="M18 6L6 18M6 6l12 12" /></Svg>;
+export const ScannerIcon = () => (
+  <Svg>
+    <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M3 12h18" />
+  </Svg>
+);
 export const SpinnerIcon = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="animate-spin" aria-hidden="true">
     <path d="M12 3a9 9 0 0 1 9 9" />

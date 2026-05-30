@@ -6,6 +6,7 @@ import { LoadingState, TopProgressBar } from './components/Skeleton';
 import { Shop } from './pages/Shop';
 import { ProductPage } from './pages/Product';
 import { Orders } from './pages/Orders';
+import { OrderPickup } from './pages/OrderPickup';
 import { Admin } from './pages/Admin';
 import { InstallPrompt } from './components/InstallPrompt';
 import { UpdatePrompt } from './components/UpdatePrompt';
@@ -30,6 +31,7 @@ export function App() {
           <Route path="/" component={Shop} />
           <Route path="/product/:id" component={ProductPage} />
           <Route path="/orders" component={Orders} />
+          <Route path="/orders/:id/pickup" component={OrderPickup} />
           <Route path="/admin">{() => <AdminGate />}</Route>
           <Route>
             <p className="text-center text-ipe-ink-50">Page not found.</p>

@@ -17,7 +17,9 @@ import { VersionBadge } from '../components/VersionBadge';
 import {
   PlusIcon, PencilIcon, SignOutIcon, PrinterIcon, UploadIcon, RefreshIcon,
   TruckIcon, PackageCheckIcon, UserCheckIcon, UserOffIcon, TrashIcon, SpinnerIcon,
+  ScannerIcon,
 } from '../components/AdminIcons';
+import { PickupScanner } from '../components/PickupScanner';
 
 type Tab = 'products' | 'orders' | 'events' | 'treasury' | 'admins';
 
@@ -760,6 +762,21 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
   const toast = useToast();
   const confirm = useConfirm();
   const productById = new Map(products.map((p) => [p.id, p] as const));
+  // Distinct pickup event slugs across the orders — used for the filter dropdown.
+  const pickupEvents = Array.from(
+    new Map(
+      orders
+        .filter((o) => o.deliveryMethod === 'pickup' && o.pickup)
+        .map((o) => [o.pickup!.eventId, o.pickup!.displayName || o.pickup!.eventId] as const),
+    ).entries(),
+  );
+  const [eventFilter, setEventFilter] = useState<string>('all');
+  const [scannerOpen, setScannerOpen] = useState(false);
+
+  const visible = orders.filter((o) => {
+    if (eventFilter === 'all') return true;
+    return o.pickup?.eventId === eventFilter;
+  });
 
   async function setStatus(o: OrderDTO, status: string) {
     // Confirm transitions that have visible side effects (email to the buyer).
@@ -811,16 +828,45 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
 
   return (
     <div className="card p-4 sm:p-5 overflow-hidden">
-      <h2 className="text-xl font-semibold text-ipe-green mb-3">Orders</h2>
-      {loading && orders.length === 0 ? (
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+        <h2 className="text-xl font-semibold text-ipe-green">Orders</h2>
+        <div className="flex items-center gap-2 flex-wrap">
+          {pickupEvents.length > 0 && (
+            <select
+              className="input text-xs py-1.5 px-2 w-auto"
+              value={eventFilter}
+              onChange={(e) => setEventFilter(e.target.value)}
+              aria-label="Filter by pickup event"
+            >
+              <option value="all">All events</option>
+              {pickupEvents.map(([slug, name]) => (
+                <option key={slug} value={slug}>{name}</option>
+              ))}
+            </select>
+          )}
+          <button className="action-btn-primary" onClick={() => setScannerOpen(true)}>
+            <ScannerIcon /> Scan pickup
+          </button>
+        </div>
+      </div>
+      {scannerOpen && (
+        <PickupScanner
+          products={products}
+          onClose={() => setScannerOpen(false)}
+          onConfirmed={() => qc.invalidateQueries({ queryKey: ['admin-orders'] })}
+        />
+      )}
+      {loading && visible.length === 0 ? (
         <TableRowsSkeleton rows={3} cols={6} />
-      ) : orders.length === 0 ? (
-        <p className="text-ipe-ink/60 text-sm">No orders yet.</p>
+      ) : visible.length === 0 ? (
+        <p className="text-ipe-ink/60 text-sm">
+          {orders.length === 0 ? 'No orders yet.' : 'No orders match this filter.'}
+        </p>
       ) : (
         <>
           {/* Mobile cards */}
           <ul className="sm:hidden space-y-3">
-            {orders.map((o) => {
+            {visible.map((o) => {
               const p = productById.get(o.productId);
               const addr = o.shippingAddress as { line1?: string; city?: string; country?: string } | null;
               return (
@@ -880,7 +926,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                 </tr>
               </thead>
               <tbody>
-                {orders.map((o) => {
+                {visible.map((o) => {
                   const p = productById.get(o.productId);
                   const addr = o.shippingAddress as { line1?: string; city?: string; country?: string } | null;
                   return (
