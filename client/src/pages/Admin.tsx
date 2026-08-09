@@ -823,7 +823,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
   }
 
   const canRefund = (o: OrderDTO) =>
-    (o.status === 'paid' || o.status === 'shipped' || o.status === 'delivered') &&
+    (o.status === 'paid' || o.status === 'shipped' || o.status === 'delivered' || o.status === 'refund_requested') &&
     (o.paymentProvider === 'mercadopago' || o.paymentProvider === 'nowpayments');
 
   return (
@@ -981,6 +981,7 @@ function badgeForStatus(s: string) {
     case 'awaiting_payment': return 'bg-purple-100 text-purple-800';
     case 'shipped': return 'bg-amber-100 text-amber-800';
     case 'delivered': return 'bg-green-100 text-green-800';
+    case 'refund_requested': return 'bg-orange-100 text-orange-800';
     case 'refunded':
     case 'cancelled': return 'bg-red-100 text-red-800';
     default: return 'bg-gray-100 text-gray-700';

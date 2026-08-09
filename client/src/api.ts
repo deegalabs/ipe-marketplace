@@ -87,7 +87,7 @@ export interface OrderDTO {
   cryptoPayUri: string | null;
   cryptoQrCodeBase64: string | null;
   blockNumber: string | null;
-  status: 'pending' | 'awaiting_payment' | 'paid' | 'shipped' | 'delivered' | 'refunded' | 'cancelled';
+  status: 'pending' | 'awaiting_payment' | 'paid' | 'shipped' | 'delivered' | 'refund_requested' | 'refunded' | 'cancelled';
   deliveryMethod: DeliveryMethod;
   shippingAddress: unknown;
   pickup: { eventId: string; displayName?: string } | null;
@@ -216,6 +216,12 @@ export const api = {
   /// or 'awaiting_payment' — once paid, status changes go through admin.
   cancelOrder: (id: string) =>
     request<OrderDTO>(`/orders/${id}/cancel`, { method: 'POST' }),
+
+  /// Buyer-initiated refund. Only succeeds while the order is still 'paid'
+  /// (not yet shipped/delivered). PIX refunds instantly; crypto orders become
+  /// 'refund_requested' for an admin to approve + send manually.
+  requestRefund: (id: string) =>
+    request<OrderDTO>(`/orders/${id}/refund`, { method: 'POST' }),
 
   treasury: () => request<TreasuryDTO>('/treasury'),
   rates: () => request<Rates>('/rates'),

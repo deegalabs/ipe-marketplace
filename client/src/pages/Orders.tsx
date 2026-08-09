@@ -121,6 +121,20 @@ function OrderRow({ order: o, product }: { order: OrderDTO; product: ProductDTO 
             </div>
           )}
 
+          {/* Refund — available while the order is paid but not yet handed over.
+              PIX refunds instantly; crypto submits a request for admin review. */}
+          {o.status === 'paid' && (
+            <div className="mt-3">
+              <RefundOrderButton order={o} />
+            </div>
+          )}
+
+          {o.status === 'refund_requested' && (
+            <p className="mt-3 text-sm text-amber-700">
+              Refund requested — our team will process it shortly.
+            </p>
+          )}
+
           <TxLink order={o} />
         </div>
       </div>
@@ -158,6 +172,45 @@ function CancelOrderButton({ order: o }: { order: OrderDTO }) {
   return (
     <button type="button" onClick={cancel} disabled={busy} className="action-btn-destructive">
       {busy ? <><SpinnerIcon /> Cancelling…</> : <><CloseIcon /> Cancel order</>}
+    </button>
+  );
+}
+
+function RefundOrderButton({ order: o }: { order: OrderDTO }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [busy, setBusy] = useState(false);
+  const isPix = o.paymentProvider === 'mercadopago';
+
+  async function requestRefund() {
+    const ok = await confirm({
+      title: 'Request a refund?',
+      body: isPix
+        ? 'Your PIX payment will be refunded to the original account. This cancels the order' +
+          (o.deliveryMethod === 'pickup' ? ' and voids your pickup ticket.' : '.')
+        : 'Crypto refunds are sent manually by our team. This submits a refund request for review.',
+      warning: 'Only available before the order is handed over. Once picked up or shipped, refunds go through support.',
+      confirmLabel: 'Request refund',
+      destructive: true,
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await api.requestRefund(o.id);
+      await qc.invalidateQueries({ queryKey: ['orders'] });
+      if (isPix) toast.success('Refund issued', 'Your PIX payment is being refunded');
+      else toast.success('Refund requested', 'Our team will process it shortly');
+    } catch (err) {
+      toast.error('Could not request refund', err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button type="button" onClick={requestRefund} disabled={busy} className="action-btn-destructive">
+      {busy ? <><SpinnerIcon /> Requesting…</> : <><RefreshIcon /> Request refund</>}
     </button>
   );
 }
@@ -373,7 +426,7 @@ function ResumePaymentModal({ order: o, onClose }: { order: OrderDTO; onClose: (
 /// Visualises fulfillment as 3 dots: paid → shipped/handed-off → delivered.
 /// Cancelled/refunded statuses skip the timeline.
 function FulfillmentTimeline({ status, delivery }: { status: string; delivery: string }) {
-  if (status === 'cancelled' || status === 'refunded') return null;
+  if (status === 'cancelled' || status === 'refunded' || status === 'refund_requested') return null;
 
   const steps = [
     { key: 'paid', label: 'Paid' },
@@ -524,6 +577,14 @@ function SpinnerIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="animate-spin" aria-hidden="true">
       <path d="M12 3a9 9 0 0 1 9 9" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5" />
     </svg>
   );
 }
