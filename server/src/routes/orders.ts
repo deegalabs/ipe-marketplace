@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { eq, and, inArray } from 'drizzle-orm';
 import { z } from 'zod';
+import QRCode from 'qrcode';
 import { createDirectOrderInputSchema, orderStatusEnum } from '@ipe/shared';
 import { db, schema } from '../db/client.js';
 import { encryptAddress, decryptAddress } from '../crypto.js';
@@ -249,6 +250,22 @@ ordersRouter.post('/:id/refund', async (req, res) => {
 async function revertToPaid(id: string) {
   await db.update(schema.orders).set({ status: 'paid', updatedAt: new Date() }).where(eq(schema.orders.id, id));
 }
+
+/// Public pickup QR as a PNG. Emails embed this by URL (data: URIs get stripped
+/// by Gmail), so the buyer can scan it straight from the inbox. Encodes the same
+/// signed pickupToken the admin scanner verifies. ID-as-authorization, like the
+/// other buyer routes.
+ordersRouter.get('/:id/pickup-qr.png', async (req, res) => {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) {
+    return res.status(404).json({ error: 'not found' });
+  }
+  const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
+  if (!order || order.deliveryMethod !== 'pickup') return res.status(404).json({ error: 'not found' });
+  const png = await QRCode.toBuffer(pickupToken(order.id), { width: 512, margin: 1 });
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+  res.send(png);
+});
 
 /// Public lookup for an order by id (used by the gateway flow to poll status while
 /// awaiting payment). Declared LAST so static segments like /admin and /by-buyer
