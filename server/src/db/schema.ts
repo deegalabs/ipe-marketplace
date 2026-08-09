@@ -107,6 +107,9 @@ export const events = pgTable('events', {
   name: text('name').notNull(),
   /// When the event happens — used to sort + show in the dropdown.
   date: timestamp('date', { withTimezone: true }).notNull(),
+  /// When the event ends — the event auto-deactivates + drops off the public
+  /// list once now() passes this. Enforced by the eventSweeper + read filter.
+  endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
   location: text('location').notNull().default(''),
   active: boolean('active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

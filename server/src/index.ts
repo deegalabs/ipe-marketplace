@@ -13,6 +13,7 @@ import { eventsRouter } from './routes/events.js';
 import { startIndexer } from './indexer.js';
 import { ensureBootstrapAdmin } from './services/auth.js';
 import { startOrderSweeper } from './services/orderSweeper.js';
+import { startEventSweeper } from './services/eventSweeper.js';
 
 const app = express();
 
@@ -120,4 +121,5 @@ app.listen(Number(env.PORT), '0.0.0.0', async () => {
     console.log('[indexer] disabled via DISABLE_INDEXER');
   }
   startOrderSweeper();
+  startEventSweeper();
 });
