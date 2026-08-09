@@ -17,6 +17,9 @@ export function ProductImage({ src, alt, className = '' }: Props) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const showFallback = !src || failed;
+  // The object-fit belongs on the <img>, not the wrapper <div> — pull it out of
+  // the caller's className (defaulting to cover) so the image never stretches.
+  const objectFit = className.match(/object-\S+/)?.[0] ?? 'object-cover';
 
   if (showFallback) {
     return (
@@ -51,7 +54,7 @@ export function ProductImage({ src, alt, className = '' }: Props) {
         alt={alt}
         onError={() => setFailed(true)}
         onLoad={() => setLoaded(true)}
-        className={`w-full h-full ${className.includes('object-') ? '' : 'object-cover'} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        className={`w-full h-full ${objectFit} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         loading="lazy"
       />
     </div>
