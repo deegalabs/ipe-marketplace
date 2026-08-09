@@ -102,7 +102,12 @@ ordersRouter.patch('/admin/:id', requireAdmin, async (req, res) => {
 ordersRouter.post('/admin/:id/refund', requireAdmin, async (req, res) => {
   const row = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
   if (!row) return res.status(404).json({ error: 'order not found' });
-  if (row.status !== 'paid' && row.status !== 'shipped' && row.status !== 'delivered') {
+  if (
+    row.status !== 'paid' &&
+    row.status !== 'shipped' &&
+    row.status !== 'delivered' &&
+    row.status !== 'refund_requested'
+  ) {
     return res.status(409).json({ error: `cannot refund order with status '${row.status}'` });
   }
 
@@ -188,6 +193,62 @@ ordersRouter.post('/:id/cancel', async (req, res) => {
   }
   res.json(serializeOrder(updated, false));
 });
+
+/// Public refund — buyer initiated, only while the order is still 'paid' (i.e.
+/// NOT yet shipped/delivered). Same ID-as-authorization model as cancel.
+///
+/// Race safety: we claim the transition with a `WHERE status = 'paid'` guard, so
+/// an admin marking the order shipped/delivered in the same instant wins the row
+/// and the buyer refund becomes a no-op 409 — a buyer can never refund an order
+/// that has already been handed over.
+///
+/// PIX (Mercado Pago) refunds automatically: we claim 'paid' → 'refunded' first,
+/// then call MP; if MP rejects we roll the status back to 'paid'. Crypto refunds
+/// can't move funds automatically (manual treasury send), so those become
+/// 'refund_requested' for an admin to approve + send.
+ordersRouter.post('/:id/refund', async (req, res) => {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) {
+    return res.status(404).json({ error: 'not found' });
+  }
+  const existing = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  if (existing.status !== 'paid') {
+    return res.status(409).json({ error: `cannot refund order with status '${existing.status}'` });
+  }
+
+  const isPix = existing.paymentProvider === 'mercadopago';
+  const target = isPix ? 'refunded' : 'refund_requested';
+
+  // Claim the transition race-safely.
+  const [claimed] = await db
+    .update(schema.orders)
+    .set({ status: target, updatedAt: new Date() })
+    .where(and(eq(schema.orders.id, req.params.id), eq(schema.orders.status, 'paid')))
+    .returning();
+  if (!claimed) {
+    const now = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
+    return res.status(409).json({ error: `cannot refund order with status '${now?.status ?? 'unknown'}'` });
+  }
+
+  if (isPix) {
+    if (!existing.paymentRef) {
+      await revertToPaid(req.params.id);
+      return res.status(409).json({ error: 'order has no payment reference' });
+    }
+    try {
+      await refundPayment(existing.paymentRef);
+    } catch (err) {
+      await revertToPaid(req.params.id);
+      return res.status(502).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  res.json(serializeOrder(claimed, false));
+});
+
+async function revertToPaid(id: string) {
+  await db.update(schema.orders).set({ status: 'paid', updatedAt: new Date() }).where(eq(schema.orders.id, id));
+}
 
 /// Public lookup for an order by id (used by the gateway flow to poll status while
 /// awaiting payment). Declared LAST so static segments like /admin and /by-buyer
