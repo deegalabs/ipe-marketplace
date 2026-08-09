@@ -48,8 +48,14 @@ async function send({ to, subject, html }: SendArgs) {
     return;
   }
   try {
-    await resend.emails.send({ from: env.RESEND_FROM_EMAIL, to, subject, html });
-    console.log(`[email] sent "${subject}" to ${to}`);
+    // Resend does NOT throw on API errors — it resolves with { data, error }.
+    // We must inspect `error` explicitly or a rejected send looks like success.
+    const { data, error } = await resend.emails.send({ from: env.RESEND_FROM_EMAIL, to, subject, html });
+    if (error) {
+      console.error(`[email] rejected "${subject}" to ${to}:`, error);
+      return;
+    }
+    console.log(`[email] sent "${subject}" to ${to} (id=${data?.id ?? '?'})`);
   } catch (err) {
     console.error(`[email] failed to send "${subject}" to ${to}`, err);
   }
@@ -94,9 +100,15 @@ const layout = (title: string, body: string) => `
             &nbsp;·&nbsp;<a href="${SUPPORT.instagram}" style="color:${C.navy};text-decoration:none;font-weight:600;">Instagram</a>
             &nbsp;·&nbsp;<a href="${SUPPORT.x}" style="color:${C.navy};text-decoration:none;font-weight:600;">X</a>
           </p>
+          <p style="font-size:11px;color:${C.muted};margin:0 0 6px;">
+            This is an automated message — please do not reply to this email.
+            For anything, reach us at <a href="mailto:${SUPPORT.email}" style="color:${C.muted};">${SUPPORT.email}</a>.
+          </p>
           <p style="font-size:11px;color:${C.muted};margin:0;">
             You received this because you placed an order at Ipê Store.
-            <a href="${esc(env.PUBLIC_APP_URL)}/orders" style="color:${C.muted};">View your orders</a>.
+            <a href="${esc(env.PUBLIC_APP_URL)}/orders" style="color:${C.muted};">View your orders</a>
+            &nbsp;·&nbsp;
+            <a href="mailto:${SUPPORT.email}?subject=Unsubscribe%20from%20order%20updates" style="color:${C.muted};">Unsubscribe</a>
           </p>
         </td></tr>
       </table>
