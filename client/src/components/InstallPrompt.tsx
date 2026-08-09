@@ -7,7 +7,7 @@ interface BeforeInstallPromptEvent extends Event {
 
 const DISMISSED_KEY = 'install_prompt_dismissed_at';
 const DISMISS_TTL_MS = 1000 * 60 * 60 * 24 * 7; // re-prompt after 7 days
-const AUTO_HIDE_MS = 30_000;                    // soft auto-dismiss after 30s
+const AUTO_HIDE_MS = 40_000;                    // soft auto-dismiss after 40s
 
 /// Captures Chrome/Edge's beforeinstallprompt and surfaces a small bottom-anchored
 /// affordance for users to install the PWA. Dismissals are remembered for a week.
