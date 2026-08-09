@@ -993,11 +993,12 @@ interface EventDraft {
   slug: string;
   name: string;
   date: string;       // datetime-local value (YYYY-MM-DDTHH:mm)
+  endsAt: string;     // datetime-local value — event auto-deactivates after this
   location: string;
   active: boolean;
 }
 
-const EMPTY_EVENT: EventDraft = { slug: '', name: '', date: '', location: '', active: true };
+const EMPTY_EVENT: EventDraft = { slug: '', name: '', date: '', endsAt: '', location: '', active: true };
 
 function EventsCard() {
   const qc = useQueryClient();
@@ -1111,10 +1112,20 @@ function EventsCard() {
 
 function eventDraftFrom(e: EventDTO): EventDraft {
   // Convert ISO → datetime-local format (YYYY-MM-DDTHH:mm) in local TZ.
-  const d = new Date(e.date);
+  return {
+    slug: e.slug,
+    name: e.name,
+    date: toLocalDatetime(e.date),
+    endsAt: toLocalDatetime(e.endsAt),
+    location: e.location,
+    active: e.active,
+  };
+}
+
+function toLocalDatetime(iso: string): string {
+  const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
-  const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  return { slug: e.slug, name: e.name, date: local, location: e.location, active: e.active };
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function EventForm({
@@ -1136,19 +1147,25 @@ function EventForm({
       setError('Slug must be lowercase letters, digits or hyphens (e.g. "ipe-demo-day-2026").');
       return;
     }
-    if (!draft.name.trim() || !draft.date) {
-      setError('Name and date are required.');
+    if (!draft.name.trim() || !draft.date || !draft.endsAt) {
+      setError('Name, start and end date/time are required.');
+      return;
+    }
+    if (new Date(draft.endsAt) <= new Date(draft.date)) {
+      setError('End must be after the start date/time.');
       return;
     }
     setError(null);
     setSaving(true);
     try {
       const dateISO = new Date(draft.date).toISOString();
+      const endsAtISO = new Date(draft.endsAt).toISOString();
       if (mode === 'new') {
         await api.createEvent({
           slug: draft.slug.trim(),
           name: draft.name.trim(),
           date: dateISO,
+          endsAt: endsAtISO,
           location: draft.location.trim() || undefined,
           active: draft.active,
         });
@@ -1157,6 +1174,7 @@ function EventForm({
         await api.updateEvent(targetId!, {
           name: draft.name.trim(),
           date: dateISO,
+          endsAt: endsAtISO,
           location: draft.location.trim(),
           active: draft.active,
         });
@@ -1196,12 +1214,22 @@ function EventForm({
           />
         </Field>
 
-        <Field label="Date & time" required>
+        <Field label="Starts" required hint="When the event begins.">
           <input
             className="input"
             type="datetime-local"
             value={draft.date}
             onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+          />
+        </Field>
+
+        <Field label="Ends" required hint="Auto-deactivates + hides from buyers once this passes.">
+          <input
+            className="input"
+            type="datetime-local"
+            value={draft.endsAt}
+            min={draft.date || undefined}
+            onChange={(e) => setDraft({ ...draft, endsAt: e.target.value })}
           />
         </Field>
 

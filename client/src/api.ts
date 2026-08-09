@@ -244,9 +244,9 @@ export const api = {
   /// admin endpoint returns everything for the management UI.
   listEvents: () => request<EventDTO[]>('/events'),
   adminListEvents: () => request<EventDTO[]>('/events/admin', { admin: true }),
-  createEvent: (body: { slug: string; name: string; date: string; location?: string; active?: boolean }) =>
+  createEvent: (body: { slug: string; name: string; date: string; endsAt: string; location?: string; active?: boolean }) =>
     request<EventDTO>('/events/admin', { admin: true, method: 'POST', body: JSON.stringify(body) }),
-  updateEvent: (id: string, body: { name?: string; date?: string; location?: string; active?: boolean }) =>
+  updateEvent: (id: string, body: { name?: string; date?: string; endsAt?: string; location?: string; active?: boolean }) =>
     request<EventDTO>(`/events/admin/${id}`, { admin: true, method: 'PATCH', body: JSON.stringify(body) }),
   deleteEvent: (id: string) =>
     request<{ ok: true }>(`/events/admin/${id}`, { admin: true, method: 'DELETE' }),
@@ -257,6 +257,7 @@ export interface EventDTO {
   slug: string;
   name: string;
   date: string;
+  endsAt: string;
   location: string;
   active: boolean;
   createdAt: string;
