@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { env, features } from '../env.js';
 
 const MP_BASE = 'https://api.mercadopago.com';
@@ -131,5 +131,7 @@ export function verifyWebhookSignature(headers: {
 
   const manifest = `id:${headers.paymentId};request-id:${headers.requestId};ts:${ts};`;
   const expected = createHmac('sha256', env.MERCADOPAGO_WEBHOOK_SECRET).update(manifest).digest('hex');
-  return expected === v1;
+  const a = Buffer.from(expected);
+  const b = Buffer.from(v1);
+  return a.length === b.length && timingSafeEqual(a, b);
 }

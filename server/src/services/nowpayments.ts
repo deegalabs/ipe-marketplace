@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { env, features } from '../env.js';
 
 const NP_BASE = 'https://api.nowpayments.io/v1';
@@ -244,7 +244,9 @@ export function verifyIpnSignature(rawBody: string, signature: string | undefine
   const expected = createHmac('sha512', env.NOWPAYMENTS_IPN_SECRET)
     .update(JSON.stringify(sorted))
     .digest('hex');
-  return expected === signature;
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signature);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 function sortObjectKeys(obj: unknown): unknown {
