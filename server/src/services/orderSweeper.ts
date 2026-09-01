@@ -1,5 +1,6 @@
 import { and, inArray, lt } from 'drizzle-orm';
 import { db, schema } from '../db/client.js';
+import { restoreStock } from './stock.js';
 
 /// Auto-cancel orders that have been sitting in 'pending' or 'awaiting_payment'
 /// past the TTL. The interval is conservative because both PSPs we use have
@@ -38,8 +39,10 @@ async function sweepStaleOrders() {
           lt(schema.orders.createdAt, cutoff),
         ),
       )
-      .returning({ id: schema.orders.id });
+      .returning({ id: schema.orders.id, productId: schema.orders.productId, quantity: schema.orders.quantity });
     if (cancelled.length > 0) {
+      // Return the reserved stock for each expired order.
+      for (const o of cancelled) await restoreStock(o.productId, o.quantity);
       console.log(`[order-sweeper] auto-cancelled ${cancelled.length} stale order(s):`, cancelled.map((o) => o.id).join(', '));
     }
   } catch (err) {

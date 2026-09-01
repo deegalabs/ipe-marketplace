@@ -14,6 +14,7 @@ import {
 } from '../services/email.js';
 import { requireAdmin } from '../middleware/requireAdmin.js';
 import { authenticateWallet } from '../services/auth.js';
+import { reserveStock, restoreStock } from '../services/stock.js';
 import { refundPayment } from '../services/mercadopago.js';
 import { pickupToken, verifyPickupToken } from '../services/pickupToken.js';
 
@@ -22,6 +23,15 @@ export const ordersRouter = Router();
 /// Tighter limit for buyer-initiated state changes (cancel/refund) than the
 /// global 60/min — these are keyed by an order id anyone could try to enumerate.
 const buyerActionLimiter = rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false });
+
+/// A reserved unit returns to stock only when the order is released before the
+/// item physically leaves — cancelled/refunded from a not-yet-shipped state.
+/// shipped/delivered are excluded (the unit is already gone; a physical return
+/// is a manual admin decision).
+const RETURNABLE_FROM = new Set(['pending', 'awaiting_payment', 'paid', 'refund_requested']);
+function releasesStock(from: string, to: string): boolean {
+  return (to === 'cancelled' || to === 'refunded') && RETURNABLE_FROM.has(from);
+}
 
 ordersRouter.post('/', async (req, res) => {
   const parsed = createDirectOrderInputSchema.safeParse(req.body);
@@ -43,6 +53,11 @@ ordersRouter.post('/', async (req, res) => {
     if (evt) pickupName = evt.name;
   }
 
+  // Reserve stock atomically before creating the order (anti-oversell).
+  if (!(await reserveStock(parsed.data.productId, parsed.data.quantity))) {
+    return res.status(409).json({ error: 'not enough stock available' });
+  }
+
   const [row] = await db
     .insert(schema.orders)
     .values({
@@ -62,8 +77,12 @@ ordersRouter.post('/', async (req, res) => {
       pickupDisplayName: pickupName,
     })
     .returning();
-  if (row) void sendAdminNewOrder(row, product);
-  res.status(201).json(serializeOrder(row!, false));
+  if (!row) {
+    await restoreStock(parsed.data.productId, parsed.data.quantity);
+    return res.status(500).json({ error: 'order insert failed' });
+  }
+  void sendAdminNewOrder(row, product);
+  res.status(201).json(serializeOrder(row, false));
 });
 
 /// Buyer's own orders. Requires a Privy session whose linked wallet matches the
@@ -103,12 +122,16 @@ const patchSchema = z.object({
 ordersRouter.patch('/admin/:id', requireAdmin, async (req, res) => {
   const parsed = patchSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const before = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
   const [row] = await db
     .update(schema.orders)
     .set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(schema.orders.id, req.params.id))
     .returning();
   if (!row) return res.status(404).json({ error: 'order not found' });
+  if (before && releasesStock(before.status, row.status)) {
+    await restoreStock(row.productId, row.quantity);
+  }
 
   // Status transition emails (best-effort).
   if (parsed.data.status) {
@@ -157,6 +180,9 @@ ordersRouter.post('/admin/:id/refund', requireAdmin, async (req, res) => {
     .set({ status: 'refunded', updatedAt: new Date() })
     .where(eq(schema.orders.id, req.params.id))
     .returning();
+  if (updated && releasesStock(row.status, 'refunded')) {
+    await restoreStock(updated.productId, updated.quantity);
+  }
   res.json(serializeOrder(updated!, true));
 });
 
@@ -223,6 +249,8 @@ ordersRouter.post('/:id/cancel', buyerActionLimiter, async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'not found' });
     return res.status(409).json({ error: `cannot cancel order with status '${existing.status}'` });
   }
+  // Pre-paid → cancelled always releases the reserved unit.
+  await restoreStock(updated.productId, updated.quantity);
   res.json(serializeOrder(updated, false));
 });
 
@@ -278,6 +306,11 @@ ordersRouter.post('/:id/refund', buyerActionLimiter, async (req, res) => {
     }
   }
 
+  // PIX refunds settle to 'refunded' now (releases the unit); crypto stays
+  // 'refund_requested' and releases only when the admin approves it.
+  if (releasesStock('paid', target)) {
+    await restoreStock(claimed.productId, claimed.quantity);
+  }
   res.json(serializeOrder(claimed, false));
 });
 

@@ -15,6 +15,7 @@ import {
 import { paymentUriFor } from '../services/cryptoPaymentUri.js';
 import { roundUpCryptoAmount } from '../services/cryptoAmount.js';
 import { mintReceiptForGatewayOrder } from '../services/onchain.js';
+import { reserveStock, restoreStock } from '../services/stock.js';
 import { usdcToBrlCents } from './rates.js';
 import {
   sendOrderCreated,
@@ -35,9 +36,8 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
   });
   if (!product) return res.status(404).json({ error: 'product not found' });
   if (!product.active) return res.status(409).json({ error: 'product is not available' });
-  if (product.physicalStock === 0) return res.status(409).json({ error: 'sold out' });
   if (product.physicalStock < parsed.data.quantity) {
-    return res.status(409).json({ error: `only ${product.physicalStock} left in stock` });
+    return res.status(409).json({ error: product.physicalStock > 0 ? `only ${product.physicalStock} left in stock` : 'sold out' });
   }
 
   if (parsed.data.paymentMethod === 'pix' && !features.mercadopago) {
@@ -76,6 +76,12 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
     if (evt) pickupName = evt.name;
   }
 
+  // Atomically reserve stock so concurrent buyers can't oversell while paying.
+  // Restored on cancel/expiry/charge-failure below.
+  if (!(await reserveStock(parsed.data.productId, parsed.data.quantity))) {
+    return res.status(409).json({ error: 'not enough stock available' });
+  }
+
   // Insert as awaiting_payment. We'll fill paymentRef + checkout details below.
   const [order] = await db
     .insert(schema.orders)
@@ -95,7 +101,10 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
       pickupDisplayName: pickupName,
     })
     .returning();
-  if (!order) return res.status(500).json({ error: 'order insert failed' });
+  if (!order) {
+    await restoreStock(parsed.data.productId, parsed.data.quantity);
+    return res.status(500).json({ error: 'order insert failed' });
+  }
 
   try {
     if (parsed.data.paymentMethod === 'pix') {
@@ -199,12 +208,13 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
     }
   } catch (err) {
     console.error('[gateway] charge creation failed', err);
-    // Best-effort cleanup: mark the placeholder order as cancelled so it doesn't
-    // sit forever in awaiting_payment.
+    // Best-effort cleanup: cancel the placeholder order and return the reserved
+    // stock so it doesn't sit forever in awaiting_payment holding inventory.
     await db
       .update(schema.orders)
       .set({ status: 'cancelled', updatedAt: new Date() })
       .where(eq(schema.orders.id, order.id));
+    await restoreStock(order.productId, order.quantity);
     return res.status(502).json({ error: 'failed to create gateway charge' });
   }
 });
