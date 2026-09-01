@@ -8,6 +8,7 @@ import type { ProductDTO } from '../api';
 import type { ShippingFormValues } from './ShippingForm';
 import type { PickupFormValues } from './PickupForm';
 import { useToast } from '../lib/toast';
+import { safeWalletUri } from '../lib/uri';
 
 type GatewayMethod = 'pix' | 'crypto-gateway';
 
@@ -563,13 +564,15 @@ function CryptoPayView({ crypto, payCurrency }: { crypto: CryptoPayment; payCurr
         className="mx-auto w-56 h-56 rounded border border-ipe-green/10 bg-white"
       />
 
-      <a
-        href={crypto.payUri}
-        className="btn-ghost w-full text-xs sm:hidden"
-        rel="noreferrer"
-      >
-        Open in wallet
-      </a>
+      {safeWalletUri(crypto.payUri) && (
+        <a
+          href={safeWalletUri(crypto.payUri) as string}
+          className="btn-ghost w-full text-xs sm:hidden"
+          rel="noreferrer"
+        >
+          Open in wallet
+        </a>
+      )}
 
       <div>
         <label className="label">Amount</label>
