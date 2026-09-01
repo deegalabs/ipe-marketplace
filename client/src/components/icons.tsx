@@ -50,3 +50,24 @@ export function OrdersIcon({ className = '', size = 24, strokeWidth = 1.75 }: Ic
     </svg>
   );
 }
+
+export function AdminIcon({ className = '', size = 24, strokeWidth = 1.75 }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* Shield with a check — admin / access */}
+      <path d="M12 3 5 6v5c0 4.2 2.9 7.6 7 8.8 4.1-1.2 7-4.6 7-8.8V6l-7-3Z" />
+      <path d="m9 11.5 2 2 4-4" />
+    </svg>
+  );
+}

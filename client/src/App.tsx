@@ -14,7 +14,7 @@ import { VersionBadge } from './components/VersionBadge';
 import { Logo, FlowerMark } from './components/Logo';
 import { ThemeToggle } from './components/ThemeToggle';
 import { WalletMenu } from './components/WalletMenu';
-import { ShopIcon, OrdersIcon } from './components/icons';
+import { ShopIcon, OrdersIcon, AdminIcon } from './components/icons';
 import { api } from './api';
 
 export function App() {
@@ -217,20 +217,31 @@ function AdminGate({ children }: { children?: ReactNode }) {
 }
 
 /// Native-feeling bottom nav for mobile. Hidden on desktop (≥sm) where the
-/// header links cover the same routes. Admin is intentionally not here —
-/// admins reach /admin by typing the URL.
+/// header links cover the same routes. The Admin tab only appears for signed-in
+/// admins (same allowlist probe the header uses — React Query dedupes it).
 function BottomNav() {
   const [pathname] = useLocation();
+  const { ready, authenticated } = usePrivy();
+  const adminMeQ = useQuery({
+    queryKey: ['admin-me'],
+    queryFn: api.adminMe,
+    enabled: ready && authenticated,
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
+  const isAdmin = !!adminMeQ.data?.adminId;
+
   const items = [
     { href: '/', label: 'Shop', Icon: ShopIcon },
     { href: '/orders', label: 'Orders', Icon: OrdersIcon },
+    ...(isAdmin ? [{ href: '/admin', label: 'Admin', Icon: AdminIcon }] : []),
   ];
   return (
     <nav
       className="sm:hidden fixed bottom-0 inset-x-0 z-20 glass border-t border-ipe-stone-200/60"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="grid grid-cols-2">
+      <div className={isAdmin ? 'grid grid-cols-3' : 'grid grid-cols-2'}>
         {items.map((it) => {
           const active = it.href === '/' ? pathname === '/' : pathname.startsWith(it.href);
           return (
