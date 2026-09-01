@@ -283,7 +283,8 @@ ordersRouter.get('/:id/pickup-qr.png', async (req, res) => {
   if (!order || order.deliveryMethod !== 'pickup') return res.status(404).json({ error: 'not found' });
   const png = await QRCode.toBuffer(pickupToken(order.id), { width: 512, margin: 1 });
   res.setHeader('Content-Type', 'image/png');
-  res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+  // Token-bearing response: never cache in shared proxies / email scanners.
+  res.setHeader('Cache-Control', 'private, no-store');
   res.send(png);
 });
 
