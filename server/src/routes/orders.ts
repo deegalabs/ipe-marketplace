@@ -239,8 +239,11 @@ ordersRouter.post('/:id/refund', async (req, res) => {
     try {
       await refundPayment(existing.paymentRef);
     } catch (err) {
+      // Log the provider detail server-side; return a generic error so this
+      // public endpoint never leaks internal payment/provider information.
+      console.error('[orders] buyer refund failed', req.params.id, err instanceof Error ? err.message : err);
       await revertToPaid(req.params.id);
-      return res.status(502).json({ error: err instanceof Error ? err.message : String(err) });
+      return res.status(502).json({ error: 'refund failed, please try again or contact support' });
     }
   }
 
