@@ -131,7 +131,7 @@ function OrderRow({ order: o, product }: { order: OrderDTO; product: ProductDTO 
 
           {o.status === 'refund_requested' && (
             <p className="mt-3 text-sm text-amber-700">
-              Refund requested — our team will process it shortly.
+              Refund requested. Our team will process it shortly.
             </p>
           )}
 
@@ -152,7 +152,7 @@ function CancelOrderButton({ order: o }: { order: OrderDTO }) {
     const ok = await confirm({
       title: 'Cancel this order?',
       body: 'The order will be marked as cancelled and removed from the active list.',
-      warning: "If you've already sent the payment, do NOT cancel — wait for confirmation. Funds sent after cancelling won't be credited automatically.",
+      warning: "If you've already sent the payment, do NOT cancel. Wait for confirmation. Funds sent after cancelling won't be credited automatically.",
       confirmLabel: 'Yes, cancel',
       destructive: true,
     });
@@ -244,7 +244,7 @@ function ResumePaymentModal({ order: o, onClose }: { order: OrderDTO; onClose: (
     const ok = await confirm({
       title: 'Cancel this order?',
       body: 'The order will be marked as cancelled and removed from the active list.',
-      warning: "If you've already sent the payment, do NOT cancel — wait for confirmation. Funds sent after cancelling won't be credited automatically.",
+      warning: "If you've already sent the payment, do NOT cancel. Wait for confirmation. Funds sent after cancelling won't be credited automatically.",
       confirmLabel: 'Yes, cancel',
       destructive: true,
     });
@@ -403,7 +403,7 @@ function ResumePaymentModal({ order: o, onClose }: { order: OrderDTO; onClose: (
           )}
 
           <p className="text-2xs text-ipe-ink/50">
-            Crypto quote may have expired (~20 min validity). If your wallet rejects the amount, contact support — we can regenerate it.
+            Crypto quote may have expired (~20 min validity). If your wallet rejects the amount, contact support and we can regenerate it.
           </p>
 
           <div className="pt-3 border-t border-ipe-stone-200 dark:border-ipe-navy-500/30">

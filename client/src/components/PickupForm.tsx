@@ -77,7 +77,7 @@ export function PickupForm({ value, onChange }: Props) {
             No pickup events scheduled right now.
           </p>
           <p className="text-xs text-amber-700 dark:text-amber-300/80 mt-1">
-            Choose shipping above, or check back soon — the next event will appear here once the admin schedules it.
+            Choose shipping above, or check back soon. The next event will appear here once the admin schedules it.
           </p>
         </div>
       )}

@@ -25,5 +25,5 @@ export function priceDisplay(p: ProductDTO): string {
   if (BigInt(p.priceUsdc) > 0n) {
     return formatUsd(Number(BigInt(p.priceUsdc)) / 10 ** TOKEN_DECIMALS.usdc);
   }
-  return '—';
+  return '-';
 }

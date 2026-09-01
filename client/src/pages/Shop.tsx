@@ -63,7 +63,7 @@ function Hero({ count }: { count?: number }) {
           <span className="text-ipe-ink-70 font-medium">Carry the chain.</span>
         </h1>
         <p className="text-ipe-ink-70 text-base sm:text-lg max-w-prose leading-relaxed">
-          Community merch for ipê.city — pay with PIX or crypto and pick up at the next event.
+          Community merch for ipê.city. Pay with PIX or crypto and pick up at the next event.
           Onchain receipts coming soon on Base.
         </p>
         {count !== undefined && (

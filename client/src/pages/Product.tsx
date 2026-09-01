@@ -152,7 +152,7 @@ export function ProductPage() {
         if (paymentMethod === 'ipe') return `Buy for ${formatToken(p.priceIpe, 'IPE')}`;
         if (paymentMethod === 'usdc') return `Buy for ${formatToken(p.priceUsdc, 'USDC')}`;
         if (!authenticated) return 'Sign in to checkout';
-        return `Checkout — ${priceDisplay(p)}`;
+        return `Checkout · ${priceDisplay(p)}`;
     }
   })();
 
@@ -186,7 +186,7 @@ export function ProductPage() {
 
         {step === 'done' ? (
           <p className="text-ipe-green font-medium">
-            Purchase complete — your receipt is in <a href="/orders" className="underline">My orders</a>.
+            Purchase complete. Your receipt is in <a href="/orders" className="underline">My orders</a>.
           </p>
         ) : (
           <>
@@ -209,7 +209,7 @@ export function ProductPage() {
 
             {!isGateway && tokenId === null && (
               <p className="text-amber-700 text-xs">
-                Direct onchain checkout isn't available for this product yet — use "Pay with anything else" to checkout.
+                Direct onchain checkout isn't available for this product yet. Use "Pay with anything else" to checkout.
               </p>
             )}
             {!isGateway && tokenId !== null && !address && (
@@ -268,9 +268,9 @@ interface PaymentSelectorProps {
 
 function PaymentSelector({ value, onChange, enabled, priceIpe, priceUsdc }: PaymentSelectorProps) {
   const opts = [
-    { id: 'ipe' as const, label: 'IPE', sub: 'Direct onchain', price: BigInt(priceIpe) > 0n ? formatToken(priceIpe, 'IPE') : '—' },
-    { id: 'usdc' as const, label: 'USDC', sub: 'Direct onchain', price: BigInt(priceUsdc) > 0n ? formatToken(priceUsdc, 'USDC') : '—' },
-    { id: 'gateway' as const, label: 'Pay with anything else', sub: 'PIX or any crypto', price: BigInt(priceUsdc) > 0n ? formatToken(priceUsdc, 'USDC') : '—' },
+    { id: 'ipe' as const, label: 'IPE', sub: 'Direct onchain', price: BigInt(priceIpe) > 0n ? formatToken(priceIpe, 'IPE') : '-' },
+    { id: 'usdc' as const, label: 'USDC', sub: 'Direct onchain', price: BigInt(priceUsdc) > 0n ? formatToken(priceUsdc, 'USDC') : '-' },
+    { id: 'gateway' as const, label: 'Pay with anything else', sub: 'PIX or any crypto', price: BigInt(priceUsdc) > 0n ? formatToken(priceUsdc, 'USDC') : '-' },
   ];
   return (
     <fieldset className="space-y-2">

@@ -82,7 +82,7 @@ export function Admin() {
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-bold text-ipe-green">Admin</h1>
           <p className="text-xs sm:text-sm text-ipe-ink/60 truncate">
-            Signed in as {meQ.data?.email ?? user?.email?.address ?? '—'}
+            Signed in as {meQ.data?.email ?? user?.email?.address ?? '-'}
           </p>
           <VersionBadge className="mt-0.5" />
         </div>
@@ -175,7 +175,7 @@ function TreasuryCard() {
       <div className="table-wrap">
         <table className="w-full text-sm">
           <thead className="text-left text-ipe-ink/60">
-            <tr><th>Token</th><th>Treasury</th><th title="Tokens sitting in the marketplace contract — usually 0 unless a buyer paid without us forwarding to treasury yet.">In contract</th></tr>
+            <tr><th>Token</th><th>Treasury</th><th title="Tokens sitting in the marketplace contract, usually 0 unless a buyer paid without us forwarding to treasury yet.">In contract</th></tr>
           </thead>
           <tbody>
             {[...new Set(data.balances.map((b) => b.symbol))].map((sym) => {
@@ -184,8 +184,8 @@ function TreasuryCard() {
               return (
                 <tr key={sym} className="border-t border-ipe-green/10">
                   <td className="py-2 font-medium">{sym}</td>
-                  <td>{t ? fmt(t) : '—'}</td>
-                  <td>{c ? fmt(c) : '—'}</td>
+                  <td>{t ? fmt(t) : '-'}</td>
+                  <td>{c ? fmt(c) : '-'}</td>
                 </tr>
               );
             })}
@@ -291,11 +291,11 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
       if (msg.includes('existing orders')) {
         setBusyId(null);
         const deactivate = await confirm({
-          title: "Can't delete — this product has orders",
+          title: "Can't delete: this product has orders",
           body: (
             <>
               <strong>{p.name}</strong> has past orders, so deleting it would break the
-              order history. Use <strong>Deactivate</strong> instead — it hides the
+              order history. Use <strong>Deactivate</strong> instead, which hides the
               product from the shop while keeping the history intact (you can reactivate anytime).
             </>
           ),
@@ -415,7 +415,7 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
                 </p>
               </div>
               <p className="text-sm font-mono tabular-nums shrink-0">
-                {BigInt(p.priceUsdc) > 0n ? `$${(Number(p.priceUsdc) / 1e6).toFixed(2)}` : '—'}
+                {BigInt(p.priceUsdc) > 0n ? `$${(Number(p.priceUsdc) / 1e6).toFixed(2)}` : '-'}
               </p>
             </div>
             <div className="flex flex-wrap gap-2 mt-3">
@@ -471,7 +471,7 @@ function ProductsCard({ products, loading }: { products: ProductDTO[]; loading: 
                   <div className="font-medium">{p.name}</div>
                   {p.tokenId && <div className="text-2xs text-green-700">onchain #{p.tokenId}</div>}
                 </td>
-                <td>{BigInt(p.priceUsdc) > 0n ? `$${(Number(p.priceUsdc) / 1e6).toFixed(2)}` : '—'}</td>
+                <td>{BigInt(p.priceUsdc) > 0n ? `$${(Number(p.priceUsdc) / 1e6).toFixed(2)}` : '-'}</td>
                 <td>{p.physicalStock === 0 ? <span className="text-amber-700 font-medium">sold out</span> : p.physicalStock}</td>
                 <td>{p.active ? <span className="text-green-700">active</span> : <span className="text-red-600">inactive</span>}</td>
                 <td className="whitespace-nowrap">
@@ -629,7 +629,7 @@ function ProductForm({ mode, initial, targetId, onClose, onSaved }: ProductFormP
             className="input"
             value={draft.name}
             onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-            placeholder="e.g. Ipê Tee — Green"
+            placeholder="e.g. Ipê Green Tee"
           />
         </Field>
 
@@ -816,7 +816,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
     try {
       await api.refundOrder(o.id);
       await qc.invalidateQueries({ queryKey: ['admin-orders'] });
-      toast.success('Order refunded', isPix ? 'Mercado Pago refund requested' : 'Status set to refunded — send manual refund');
+      toast.success('Order refunded', isPix ? 'Mercado Pago refund requested' : 'Status set to refunded, send manual refund');
     } catch (err) {
       toast.error('Refund failed', err instanceof Error ? err.message : String(err));
     }
@@ -874,7 +874,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                   <div className="flex justify-between gap-2">
                     <div>
                       <p className="font-medium">{p?.name ?? '?'} ×{o.quantity}</p>
-                      <p className="text-xs text-ipe-ink/60 font-mono">{o.id.slice(0, 8)} · {o.buyerAddress ? `${o.buyerAddress.slice(0, 8)}…` : (o.customerEmail ?? '—')}</p>
+                      <p className="text-xs text-ipe-ink/60 font-mono">{o.id.slice(0, 8)} · {o.buyerAddress ? `${o.buyerAddress.slice(0, 8)}…` : (o.customerEmail ?? '-')}</p>
                     </div>
                     <span className={`text-xs px-2 py-0.5 h-fit rounded ${badgeForStatus(o.status)}`}>{o.status}</span>
                   </div>
@@ -886,7 +886,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                       ? `→ ${addr.line1}, ${addr.city} (${addr.country})`
                       : o.deliveryMethod === 'pickup' && o.pickup
                         ? `pickup @ ${o.pickup.displayName || o.pickup.eventId}`
-                        : '—'}
+                        : '-'}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {o.status === 'paid' && (
@@ -933,7 +933,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                     <tr key={o.id} className="border-t border-ipe-green/10 align-top">
                       <td className="py-2 font-mono text-xs">{o.id.slice(0, 8)}</td>
                       <td>{p?.name ?? '?'} ×{o.quantity}</td>
-                      <td className="font-mono text-xs">{o.buyerAddress ? `${o.buyerAddress.slice(0, 10)}…` : (o.customerEmail ?? '—')}</td>
+                      <td className="font-mono text-xs">{o.buyerAddress ? `${o.buyerAddress.slice(0, 10)}…` : (o.customerEmail ?? '-')}</td>
                       <td className="uppercase text-xs">{o.paymentMethod}</td>
                       <td>{formatPaid(o)}</td>
                       <td className="text-xs">
@@ -941,7 +941,7 @@ function OrdersCard({ orders, products, loading }: { orders: OrderDTO[]; product
                           ? `→ ${addr.line1}, ${addr.city} (${addr.country})`
                           : o.deliveryMethod === 'pickup' && o.pickup
                             ? `pickup @ ${o.pickup.displayName || o.pickup.eventId}`
-                            : '—'}
+                            : '-'}
                       </td>
                       <td><span className={`text-xs px-2 py-0.5 rounded ${badgeForStatus(o.status)}`}>{o.status}</span></td>
                       <td>
@@ -1234,7 +1234,7 @@ function EventForm({
           />
         </Field>
 
-        <Field label="Location" hint="Optional — shown to buyers under the dropdown.">
+        <Field label="Location" hint="Optional. Shown to buyers under the dropdown.">
           <input
             className="input"
             value={draft.location}
@@ -1250,7 +1250,7 @@ function EventForm({
               checked={draft.active}
               onChange={(e) => setDraft({ ...draft, active: e.target.checked })}
             />
-            Active — show in pickup dropdown
+            Active, shown in pickup dropdown
           </label>
         </Field>
       </div>
@@ -1340,7 +1340,7 @@ function ImageUrlField({ value, onChange }: { value: string; onChange: (v: strin
           {mode === 'url' && isDrive && (
             <details className="text-[11px]">
               <summary className="text-ipe-navy-600 dark:text-ipe-lime cursor-pointer">
-                Drive link detected — how to make it public
+                Drive link detected: how to make it public
               </summary>
               <div className="mt-1.5 space-y-1 text-ipe-ink-70">
                 <p>We auto-rewrite Drive share URLs to a thumbnail endpoint. To make it visible to buyers, the file must be shared publicly:</p>

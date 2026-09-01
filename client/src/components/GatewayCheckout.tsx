@@ -394,7 +394,7 @@ function CoinPicker({ coins, loading, errored, submitting, usdAmount, onPick }: 
   return (
     <div className="p-5 space-y-3">
       <p className="text-sm text-ipe-ink/70">
-        Total: <strong>~${usdAmount.toFixed(2)} USD</strong> — equivalent in the coin you pick, locked at fill time.
+        Total: <strong>~${usdAmount.toFixed(2)} USD</strong>, equivalent in the coin you pick, locked at fill time.
       </p>
 
       {loading && (

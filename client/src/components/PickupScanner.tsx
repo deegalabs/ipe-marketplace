@@ -200,7 +200,7 @@ function ConfirmView({
           <p className="font-medium">
             {product?.name ?? 'Product'} <span className="text-ipe-ink/50">×{order.quantity}</span>
           </p>
-          <p className="text-sm text-ipe-ink/70">{order.customerEmail ?? '—'}</p>
+          <p className="text-sm text-ipe-ink/70">{order.customerEmail ?? '-'}</p>
           {order.pickup && (
             <p className="text-xs text-ipe-ink/60">
               📍 {order.pickup.displayName || order.pickup.eventId}
@@ -221,7 +221,7 @@ function ConfirmView({
 
       {!isReady && !isAlreadyDelivered && (
         <p className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded p-2.5">
-          This order isn't paid yet — cannot mark as delivered. Tell the buyer to complete payment.
+          This order isn't paid yet, so you can't mark it as delivered. Tell the buyer to complete payment.
         </p>
       )}
       {isAlreadyDelivered && (

@@ -64,7 +64,7 @@ export function InstallPosterModal({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <p className="text-2xs text-ipe-ink/50">
-            Preview below. ⌘P / Ctrl+P to print or save as PDF — only the poster comes through.
+            Preview below. ⌘P / Ctrl+P to print or save as PDF. Only the poster comes through.
           </p>
         </div>
 
