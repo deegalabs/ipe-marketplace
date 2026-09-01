@@ -118,7 +118,7 @@ function Header() {
           {isAdmin && (
             <Link
               href="/admin"
-              className="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-md border border-ipe-gold/40 text-ipe-navy-700 dark:text-ipe-gold hover:bg-ipe-gold/10 transition-colors"
+              className="hidden sm:inline-flex items-center px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-md border border-ipe-gold/40 text-ipe-navy-700 dark:text-ipe-gold hover:bg-ipe-gold/10 transition-colors"
               title="Admin dashboard"
             >
               Admin
