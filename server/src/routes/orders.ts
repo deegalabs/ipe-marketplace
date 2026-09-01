@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { eq, and, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import QRCode from 'qrcode';
@@ -17,6 +18,10 @@ import { refundPayment } from '../services/mercadopago.js';
 import { pickupToken, verifyPickupToken } from '../services/pickupToken.js';
 
 export const ordersRouter = Router();
+
+/// Tighter limit for buyer-initiated state changes (cancel/refund) than the
+/// global 60/min — these are keyed by an order id anyone could try to enumerate.
+const buyerActionLimiter = rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false });
 
 ordersRouter.post('/', async (req, res) => {
   const parsed = createDirectOrderInputSchema.safeParse(req.body);
@@ -189,7 +194,7 @@ ordersRouter.post('/admin/pickup/confirm', requireAdmin, async (req, res) => {
 /// buyer (My Orders, post-checkout polling), so knowing the ID is treated as
 /// authorization for cancel. No wallet signature required — most gateway
 /// orders don't have a wallet attached.
-ordersRouter.post('/:id/cancel', async (req, res) => {
+ordersRouter.post('/:id/cancel', buyerActionLimiter, async (req, res) => {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) {
     return res.status(404).json({ error: 'not found' });
   }
@@ -224,7 +229,7 @@ ordersRouter.post('/:id/cancel', async (req, res) => {
 /// then call MP; if MP rejects we roll the status back to 'paid'. Crypto refunds
 /// can't move funds automatically (manual treasury send), so those become
 /// 'refund_requested' for an admin to approve + send.
-ordersRouter.post('/:id/refund', async (req, res) => {
+ordersRouter.post('/:id/refund', buyerActionLimiter, async (req, res) => {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) {
     return res.status(404).json({ error: 'not found' });
   }
