@@ -36,5 +36,8 @@ export function extractDriveFileId(input: string): string | null {
 export function normalizeImageUrl(input: string, size = 1200): string {
   const driveId = extractDriveFileId(input);
   if (driveId) return `https://lh3.googleusercontent.com/d/${driveId}=s${size}`;
-  return input.trim();
+  // Only allow https URLs through — blocks http (mixed content), and
+  // javascript:/data: schemes that could be abused when rendered in <img>.
+  const trimmed = input.trim();
+  return /^https:\/\//i.test(trimmed) ? trimmed : '';
 }
