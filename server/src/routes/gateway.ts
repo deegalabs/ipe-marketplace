@@ -256,6 +256,17 @@ gatewayRouter.post('/webhooks/mercadopago', async (req, res) => {
     if (!payment.external_reference) return res.status(200).send();
 
     if (payment.status === 'approved') {
+      // Defense-in-depth: confirm the approved amount covers the order total
+      // (BRL cents) before fulfilling — signature already blocks forgery, this
+      // catches an amount/currency mismatch. 1-cent tolerance for float math.
+      const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, payment.external_reference) });
+      if (order) {
+        const paidCents = Math.round(payment.transaction_amount * 100);
+        if (paidCents + 1 < Number(order.totalPaid)) {
+          console.error(`[mercadopago] underpayment for ${order.id}: paid ${paidCents}c < expected ${order.totalPaid}c — not marking paid`);
+          return res.status(200).send();
+        }
+      }
       await markPaidAndMint(payment.external_reference);
     } else if (payment.status === 'refunded' || payment.status === 'charged_back') {
       // Mirror gateway state — refund may have been initiated from MP dashboard
@@ -284,9 +295,9 @@ gatewayRouter.post('/webhooks/nowpayments', raw({ type: 'application/json' }), a
     console.warn('[nowpayments] webhook signature mismatch');
     return res.status(401).send();
   }
-  let parsed: { order_id?: string; payment_status?: string };
+  let parsed: { order_id?: string; payment_status?: string; actually_paid?: number; pay_amount?: number };
   try {
-    parsed = JSON.parse(rawBody) as { order_id?: string; payment_status?: string };
+    parsed = JSON.parse(rawBody) as typeof parsed;
   } catch {
     return res.status(400).send();
   }
@@ -296,6 +307,17 @@ gatewayRouter.post('/webhooks/nowpayments', raw({ type: 'application/json' }), a
   // Conservative for the PoC: only 'finished' marks the order paid.
   if (parsed.payment_status !== 'finished') {
     console.log(`[nowpayments] ${parsed.order_id} status=${parsed.payment_status} — ignoring`);
+    return res.status(200).send();
+  }
+
+  // Defense-in-depth: 'finished' already implies the invoice was fully paid, but
+  // reject explicitly if the received crypto is short of the expected amount.
+  if (
+    typeof parsed.actually_paid === 'number' &&
+    typeof parsed.pay_amount === 'number' &&
+    parsed.actually_paid + 1e-9 < parsed.pay_amount
+  ) {
+    console.error(`[nowpayments] underpayment for ${parsed.order_id}: paid ${parsed.actually_paid} < expected ${parsed.pay_amount} — not marking paid`);
     return res.status(200).send();
   }
 
