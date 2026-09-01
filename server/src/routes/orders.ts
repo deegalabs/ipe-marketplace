@@ -34,6 +34,15 @@ ordersRouter.post('/', async (req, res) => {
   if (unit === 0n) return res.status(400).json({ error: 'payment method not enabled for this product' });
   const totalPaid = unit * BigInt(parsed.data.quantity);
 
+  // Resolve the pickup display name from the event record (server is the source
+  // of truth) rather than trusting the buyer-supplied string, which is shown to
+  // admin staff. Falls back to the client value only if the event is unknown.
+  let pickupName: string | null = parsed.data.pickup?.displayName ?? null;
+  if (parsed.data.pickup?.eventId) {
+    const evt = await db.query.events.findFirst({ where: eq(schema.events.slug, parsed.data.pickup.eventId) });
+    if (evt) pickupName = evt.name;
+  }
+
   const [row] = await db
     .insert(schema.orders)
     .values({
@@ -50,7 +59,7 @@ ordersRouter.post('/', async (req, res) => {
       deliveryMethod: parsed.data.deliveryMethod,
       shippingAddressEnc: parsed.data.shippingAddress ? encryptAddress(parsed.data.shippingAddress) : null,
       pickupEventId: parsed.data.pickup?.eventId ?? null,
-      pickupDisplayName: parsed.data.pickup?.displayName ?? null,
+      pickupDisplayName: pickupName,
     })
     .returning();
   if (row) void sendAdminNewOrder(row, product);
