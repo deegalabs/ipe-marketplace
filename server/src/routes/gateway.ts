@@ -4,7 +4,7 @@ import QRCode from 'qrcode';
 import { createGatewayOrderInputSchema } from '@ipe/shared';
 import { db, schema } from '../db/client.js';
 import { encryptAddress } from '../crypto.js';
-import { features } from '../env.js';
+import { env, features } from '../env.js';
 import { createPixCharge, getPayment, verifyWebhookSignature } from '../services/mercadopago.js';
 import {
   createInvoice,
@@ -355,6 +355,13 @@ async function markPaidAndMint(orderId: string) {
 // by checking that the request comes from localhost.
 
 gatewayRouter.post('/orders/gateway/:id/dev-confirm', async (req, res) => {
+  // Hard off-switch in production: this endpoint marks an order paid + mints a
+  // receipt with no payment, so it must never exist in prod. The loopback check
+  // below is only a secondary guard for local/staging (req.ip is proxy-derived
+  // and not a security boundary on its own).
+  if (env.NODE_ENV === 'production') {
+    return res.status(404).end();
+  }
   const ip = req.ip ?? '';
   if (!ip.includes('127.0.0.1') && !ip.includes('::1') && !ip.includes('localhost')) {
     return res.status(403).json({ error: 'dev-confirm only available from localhost' });
