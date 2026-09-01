@@ -58,9 +58,14 @@ adminAuthRouter.post('/admins', requireAdmin, async (req, res) => {
 adminAuthRouter.patch('/admins/:id', requireAdmin, async (req, res) => {
   const parsed = upsertSchema.partial().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  // Normalize email casing to match the lowercased lookup in authenticateAdmin,
+  // otherwise a mixed-case row would never authenticate.
+  const update = parsed.data.email
+    ? { ...parsed.data, email: parsed.data.email.toLowerCase() }
+    : parsed.data;
   const [row] = await db
     .update(schema.adminUsers)
-    .set(parsed.data)
+    .set(update)
     .where(eq(schema.adminUsers.id, req.params.id))
     .returning();
   if (!row) return res.status(404).json({ error: 'admin not found' });
