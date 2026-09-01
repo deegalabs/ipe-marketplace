@@ -12,6 +12,7 @@ import {
   sendOrderDelivered,
 } from '../services/email.js';
 import { requireAdmin } from '../middleware/requireAdmin.js';
+import { authenticateWallet } from '../services/auth.js';
 import { refundPayment } from '../services/mercadopago.js';
 import { pickupToken, verifyPickupToken } from '../services/pickupToken.js';
 
@@ -51,9 +52,25 @@ ordersRouter.post('/', async (req, res) => {
   res.status(201).json(serializeOrder(row!, false));
 });
 
+/// Buyer's own orders. Requires a Privy session whose linked wallet matches the
+/// requested address — the address alone is a PUBLIC identifier, so without this
+/// anyone could read another buyer's pickupToken + payment payloads by address.
 ordersRouter.get('/by-buyer/:address', async (req, res) => {
+  const auth = req.header('authorization') ?? '';
+  const token = auth.startsWith('Bearer ') ? auth.slice('Bearer '.length) : null;
+  if (!token) return res.status(401).json({ error: 'missing token' });
+
+  const address = req.params.address.toLowerCase();
+  try {
+    const wallets = await authenticateWallet(token);
+    if (!wallets.includes(address)) return res.status(403).json({ error: 'not your orders' });
+  } catch (err) {
+    console.warn('[auth] buyer verification failed:', err instanceof Error ? err.message : err);
+    return res.status(401).json({ error: 'invalid or expired session' });
+  }
+
   const rows = await db.query.orders.findMany({
-    where: eq(schema.orders.buyerAddress, req.params.address.toLowerCase()),
+    where: eq(schema.orders.buyerAddress, address),
     orderBy: (o, { desc }) => desc(o.createdAt),
   });
   res.json(rows.map((r) => serializeOrder(r, false)));
