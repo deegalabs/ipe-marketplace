@@ -1,5 +1,14 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual, hkdfSync } from 'node:crypto';
 import { env } from '../env.js';
+
+/// Key separation: the shipping-address AES-256-GCM cipher uses the master key
+/// directly, so we must NOT reuse the same secret verbatim as the pickup HMAC
+/// key. Derive an independent subkey with HKDF (distinct `info` label). This is
+/// deterministic — sign and verify both derive the same subkey — and there is
+/// no stored token to migrate.
+const PICKUP_HMAC_KEY = Buffer.from(
+  hkdfSync('sha256', Buffer.from(env.SHIPPING_ENCRYPTION_KEY, 'hex'), Buffer.alloc(0), 'ipe-pickup-token-hmac-v1', 32),
+);
 
 /// Compact signed token shown to buyers as a QR for in-person pickup. Format:
 ///
@@ -40,7 +49,7 @@ export function verifyPickupToken(token: string): string | null {
 }
 
 function sign(orderId: string): string {
-  return createHmac('sha256', env.SHIPPING_ENCRYPTION_KEY)
+  return createHmac('sha256', PICKUP_HMAC_KEY)
     .update(orderId)
     .digest('base64url')
     .slice(0, TOKEN_BYTES * 2); // 12 raw bytes → 16 base64url chars

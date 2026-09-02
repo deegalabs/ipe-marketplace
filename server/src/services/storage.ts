@@ -23,6 +23,18 @@ function client(): SupabaseClient {
 /// renders these into `<img>` (the browser executes them in some contexts).
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
+/// Sniff the real image type from magic bytes. The client-declared content-type
+/// (from multer) is attacker-controlled, so we never trust it — a file claiming
+/// image/png could carry HTML/SVG. Returns null when the bytes match no known
+/// raster image, which we then reject.
+function sniffImageMime(b: Buffer): string | null {
+  if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b.length >= 4 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return 'image/gif';
+  if (b.length >= 12 && b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  return null;
+}
+
 interface UploadArgs {
   buffer: Buffer;
   mimeType: string;
@@ -40,17 +52,19 @@ interface UploadResult {
 /// File name is a UUID + extension from the MIME type — we discard the
 /// original filename so admin can drop any sketchy `foo.png; rm -rf` in.
 export async function uploadProductImage(args: UploadArgs): Promise<UploadResult> {
-  if (!ALLOWED_MIME.has(args.mimeType)) {
-    throw new Error(`unsupported file type: ${args.mimeType}`);
+  // Validate by real magic bytes, not the client-declared content-type.
+  const mime = sniffImageMime(args.buffer);
+  if (!mime || !ALLOWED_MIME.has(mime)) {
+    throw new Error('unsupported or invalid image file');
   }
-  const ext = args.mimeType.split('/')[1].replace('jpeg', 'jpg');
+  const ext = mime.split('/')[1].replace('jpeg', 'jpg');
   const path = `${randomUUID()}.${ext}`;
 
   const sb = client();
   const { error } = await sb.storage
     .from(env.SUPABASE_PRODUCTS_BUCKET)
     .upload(path, args.buffer, {
-      contentType: args.mimeType,
+      contentType: mime,
       // Don't allow overwrite — the UUID path makes collisions impossible,
       // but defense in depth.
       upsert: false,

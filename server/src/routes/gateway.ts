@@ -4,7 +4,7 @@ import QRCode from 'qrcode';
 import { createGatewayOrderInputSchema } from '@ipe/shared';
 import { db, schema } from '../db/client.js';
 import { encryptAddress } from '../crypto.js';
-import { features } from '../env.js';
+import { env, features } from '../env.js';
 import { createPixCharge, getPayment, verifyWebhookSignature } from '../services/mercadopago.js';
 import {
   createInvoice,
@@ -15,6 +15,7 @@ import {
 import { paymentUriFor } from '../services/cryptoPaymentUri.js';
 import { roundUpCryptoAmount } from '../services/cryptoAmount.js';
 import { mintReceiptForGatewayOrder } from '../services/onchain.js';
+import { reserveStock, restoreStock } from '../services/stock.js';
 import { usdcToBrlCents } from './rates.js';
 import {
   sendOrderCreated,
@@ -35,9 +36,8 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
   });
   if (!product) return res.status(404).json({ error: 'product not found' });
   if (!product.active) return res.status(409).json({ error: 'product is not available' });
-  if (product.physicalStock === 0) return res.status(409).json({ error: 'sold out' });
   if (product.physicalStock < parsed.data.quantity) {
-    return res.status(409).json({ error: `only ${product.physicalStock} left in stock` });
+    return res.status(409).json({ error: product.physicalStock > 0 ? `only ${product.physicalStock} left in stock` : 'sold out' });
   }
 
   if (parsed.data.paymentMethod === 'pix' && !features.mercadopago) {
@@ -76,6 +76,12 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
     if (evt) pickupName = evt.name;
   }
 
+  // Atomically reserve stock so concurrent buyers can't oversell while paying.
+  // Restored on cancel/expiry/charge-failure below.
+  if (!(await reserveStock(parsed.data.productId, parsed.data.quantity))) {
+    return res.status(409).json({ error: 'not enough stock available' });
+  }
+
   // Insert as awaiting_payment. We'll fill paymentRef + checkout details below.
   const [order] = await db
     .insert(schema.orders)
@@ -95,7 +101,10 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
       pickupDisplayName: pickupName,
     })
     .returning();
-  if (!order) return res.status(500).json({ error: 'order insert failed' });
+  if (!order) {
+    await restoreStock(parsed.data.productId, parsed.data.quantity);
+    return res.status(500).json({ error: 'order insert failed' });
+  }
 
   try {
     if (parsed.data.paymentMethod === 'pix') {
@@ -199,12 +208,13 @@ gatewayRouter.post('/orders/gateway', async (req, res) => {
     }
   } catch (err) {
     console.error('[gateway] charge creation failed', err);
-    // Best-effort cleanup: mark the placeholder order as cancelled so it doesn't
-    // sit forever in awaiting_payment.
+    // Best-effort cleanup: cancel the placeholder order and return the reserved
+    // stock so it doesn't sit forever in awaiting_payment holding inventory.
     await db
       .update(schema.orders)
       .set({ status: 'cancelled', updatedAt: new Date() })
       .where(eq(schema.orders.id, order.id));
+    await restoreStock(order.productId, order.quantity);
     return res.status(502).json({ error: 'failed to create gateway charge' });
   }
 });
@@ -256,6 +266,17 @@ gatewayRouter.post('/webhooks/mercadopago', async (req, res) => {
     if (!payment.external_reference) return res.status(200).send();
 
     if (payment.status === 'approved') {
+      // Defense-in-depth: confirm the approved amount covers the order total
+      // (BRL cents) before fulfilling — signature already blocks forgery, this
+      // catches an amount/currency mismatch. 1-cent tolerance for float math.
+      const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, payment.external_reference) });
+      if (order) {
+        const paidCents = Math.round(payment.transaction_amount * 100);
+        if (paidCents + 1 < Number(order.totalPaid)) {
+          console.error(`[mercadopago] underpayment for ${order.id}: paid ${paidCents}c < expected ${order.totalPaid}c — not marking paid`);
+          return res.status(200).send();
+        }
+      }
       await markPaidAndMint(payment.external_reference);
     } else if (payment.status === 'refunded' || payment.status === 'charged_back') {
       // Mirror gateway state — refund may have been initiated from MP dashboard
@@ -284,9 +305,9 @@ gatewayRouter.post('/webhooks/nowpayments', raw({ type: 'application/json' }), a
     console.warn('[nowpayments] webhook signature mismatch');
     return res.status(401).send();
   }
-  let parsed: { order_id?: string; payment_status?: string };
+  let parsed: { order_id?: string; payment_status?: string; actually_paid?: number; pay_amount?: number };
   try {
-    parsed = JSON.parse(rawBody) as { order_id?: string; payment_status?: string };
+    parsed = JSON.parse(rawBody) as typeof parsed;
   } catch {
     return res.status(400).send();
   }
@@ -296,6 +317,17 @@ gatewayRouter.post('/webhooks/nowpayments', raw({ type: 'application/json' }), a
   // Conservative for the PoC: only 'finished' marks the order paid.
   if (parsed.payment_status !== 'finished') {
     console.log(`[nowpayments] ${parsed.order_id} status=${parsed.payment_status} — ignoring`);
+    return res.status(200).send();
+  }
+
+  // Defense-in-depth: 'finished' already implies the invoice was fully paid, but
+  // reject explicitly if the received crypto is short of the expected amount.
+  if (
+    typeof parsed.actually_paid === 'number' &&
+    typeof parsed.pay_amount === 'number' &&
+    parsed.actually_paid + 1e-9 < parsed.pay_amount
+  ) {
+    console.error(`[nowpayments] underpayment for ${parsed.order_id}: paid ${parsed.actually_paid} < expected ${parsed.pay_amount} — not marking paid`);
     return res.status(200).send();
   }
 
@@ -355,6 +387,13 @@ async function markPaidAndMint(orderId: string) {
 // by checking that the request comes from localhost.
 
 gatewayRouter.post('/orders/gateway/:id/dev-confirm', async (req, res) => {
+  // Hard off-switch in production: this endpoint marks an order paid + mints a
+  // receipt with no payment, so it must never exist in prod. The loopback check
+  // below is only a secondary guard for local/staging (req.ip is proxy-derived
+  // and not a security boundary on its own).
+  if (env.NODE_ENV === 'production') {
+    return res.status(404).end();
+  }
   const ip = req.ip ?? '';
   if (!ip.includes('127.0.0.1') && !ip.includes('::1') && !ip.includes('localhost')) {
     return res.status(403).json({ error: 'dev-confirm only available from localhost' });

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { eq, and, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import QRCode from 'qrcode';
@@ -12,10 +13,55 @@ import {
   sendOrderDelivered,
 } from '../services/email.js';
 import { requireAdmin } from '../middleware/requireAdmin.js';
+import { authenticateWallet, authenticateIdentity } from '../services/auth.js';
+import { reserveStock, restoreStock } from '../services/stock.js';
+import type { Request } from 'express';
 import { refundPayment } from '../services/mercadopago.js';
 import { pickupToken, verifyPickupToken } from '../services/pickupToken.js';
 
 export const ordersRouter = Router();
+
+/// Tighter limit for buyer-initiated state changes (cancel/refund) than the
+/// global 60/min — these are keyed by an order id anyone could try to enumerate.
+const buyerActionLimiter = rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false });
+
+/// A reserved unit returns to stock only when the order is released before the
+/// item physically leaves — cancelled/refunded from a not-yet-shipped state.
+/// shipped/delivered are excluded (the unit is already gone; a physical return
+/// is a manual admin decision).
+const RETURNABLE_FROM = new Set(['pending', 'awaiting_payment', 'paid', 'refund_requested']);
+function releasesStock(from: string, to: string): boolean {
+  return (to === 'cancelled' || to === 'refunded') && RETURNABLE_FROM.has(from);
+}
+
+function bearerToken(req: Request): string | null {
+  const auth = req.header('authorization') ?? '';
+  return auth.startsWith('Bearer ') ? auth.slice('Bearer '.length) : null;
+}
+
+/// Buyer actions (cancel/refund) on a WALLET-linked order require a Privy
+/// session that owns it (wallet or email match). Email-only orders have no
+/// session to bind to, so they keep the UUID-as-authorization model (guarded by
+/// the tighter buyerActionLimiter). Returns null when allowed, or the error to
+/// send when denied.
+async function checkOrderOwnership(
+  req: Request,
+  order: { buyerAddress: string | null; customerEmail: string | null },
+): Promise<{ status: number; error: string } | null> {
+  if (!order.buyerAddress) return null; // email-only → UUID auth
+  const token = bearerToken(req);
+  if (!token) return { status: 401, error: 'missing token' };
+  try {
+    const ident = await authenticateIdentity(token);
+    const owns =
+      ident.wallets.includes(order.buyerAddress.toLowerCase()) ||
+      (!!order.customerEmail && ident.emails.includes(order.customerEmail.toLowerCase()));
+    return owns ? null : { status: 403, error: 'not your order' };
+  } catch (err) {
+    console.warn('[auth] order owner verification failed:', err instanceof Error ? err.message : err);
+    return { status: 401, error: 'invalid or expired session' };
+  }
+}
 
 ordersRouter.post('/', async (req, res) => {
   const parsed = createDirectOrderInputSchema.safeParse(req.body);
@@ -27,6 +73,20 @@ ordersRouter.post('/', async (req, res) => {
   const unit = priceFor(product, parsed.data.paymentMethod);
   if (unit === 0n) return res.status(400).json({ error: 'payment method not enabled for this product' });
   const totalPaid = unit * BigInt(parsed.data.quantity);
+
+  // Resolve the pickup display name from the event record (server is the source
+  // of truth) rather than trusting the buyer-supplied string, which is shown to
+  // admin staff. Falls back to the client value only if the event is unknown.
+  let pickupName: string | null = parsed.data.pickup?.displayName ?? null;
+  if (parsed.data.pickup?.eventId) {
+    const evt = await db.query.events.findFirst({ where: eq(schema.events.slug, parsed.data.pickup.eventId) });
+    if (evt) pickupName = evt.name;
+  }
+
+  // Reserve stock atomically before creating the order (anti-oversell).
+  if (!(await reserveStock(parsed.data.productId, parsed.data.quantity))) {
+    return res.status(409).json({ error: 'not enough stock available' });
+  }
 
   const [row] = await db
     .insert(schema.orders)
@@ -44,16 +104,36 @@ ordersRouter.post('/', async (req, res) => {
       deliveryMethod: parsed.data.deliveryMethod,
       shippingAddressEnc: parsed.data.shippingAddress ? encryptAddress(parsed.data.shippingAddress) : null,
       pickupEventId: parsed.data.pickup?.eventId ?? null,
-      pickupDisplayName: parsed.data.pickup?.displayName ?? null,
+      pickupDisplayName: pickupName,
     })
     .returning();
-  if (row) void sendAdminNewOrder(row, product);
-  res.status(201).json(serializeOrder(row!, false));
+  if (!row) {
+    await restoreStock(parsed.data.productId, parsed.data.quantity);
+    return res.status(500).json({ error: 'order insert failed' });
+  }
+  void sendAdminNewOrder(row, product);
+  res.status(201).json(serializeOrder(row, false));
 });
 
+/// Buyer's own orders. Requires a Privy session whose linked wallet matches the
+/// requested address — the address alone is a PUBLIC identifier, so without this
+/// anyone could read another buyer's pickupToken + payment payloads by address.
 ordersRouter.get('/by-buyer/:address', async (req, res) => {
+  const auth = req.header('authorization') ?? '';
+  const token = auth.startsWith('Bearer ') ? auth.slice('Bearer '.length) : null;
+  if (!token) return res.status(401).json({ error: 'missing token' });
+
+  const address = req.params.address.toLowerCase();
+  try {
+    const wallets = await authenticateWallet(token);
+    if (!wallets.includes(address)) return res.status(403).json({ error: 'not your orders' });
+  } catch (err) {
+    console.warn('[auth] buyer verification failed:', err instanceof Error ? err.message : err);
+    return res.status(401).json({ error: 'invalid or expired session' });
+  }
+
   const rows = await db.query.orders.findMany({
-    where: eq(schema.orders.buyerAddress, req.params.address.toLowerCase()),
+    where: eq(schema.orders.buyerAddress, address),
     orderBy: (o, { desc }) => desc(o.createdAt),
   });
   res.json(rows.map((r) => serializeOrder(r, false)));
@@ -72,12 +152,16 @@ const patchSchema = z.object({
 ordersRouter.patch('/admin/:id', requireAdmin, async (req, res) => {
   const parsed = patchSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const before = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
   const [row] = await db
     .update(schema.orders)
     .set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(schema.orders.id, req.params.id))
     .returning();
   if (!row) return res.status(404).json({ error: 'order not found' });
+  if (before && releasesStock(before.status, row.status)) {
+    await restoreStock(row.productId, row.quantity);
+  }
 
   // Status transition emails (best-effort).
   if (parsed.data.status) {
@@ -126,6 +210,9 @@ ordersRouter.post('/admin/:id/refund', requireAdmin, async (req, res) => {
     .set({ status: 'refunded', updatedAt: new Date() })
     .where(eq(schema.orders.id, req.params.id))
     .returning();
+  if (updated && releasesStock(row.status, 'refunded')) {
+    await restoreStock(updated.productId, updated.quantity);
+  }
   res.json(serializeOrder(updated!, true));
 });
 
@@ -172,10 +259,15 @@ ordersRouter.post('/admin/pickup/confirm', requireAdmin, async (req, res) => {
 /// buyer (My Orders, post-checkout polling), so knowing the ID is treated as
 /// authorization for cancel. No wallet signature required — most gateway
 /// orders don't have a wallet attached.
-ordersRouter.post('/:id/cancel', async (req, res) => {
+ordersRouter.post('/:id/cancel', buyerActionLimiter, async (req, res) => {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) {
     return res.status(404).json({ error: 'not found' });
   }
+  const existing = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  const deny = await checkOrderOwnership(req, existing);
+  if (deny) return res.status(deny.status).json({ error: deny.error });
+
   const [updated] = await db
     .update(schema.orders)
     .set({ status: 'cancelled', updatedAt: new Date() })
@@ -187,11 +279,10 @@ ordersRouter.post('/:id/cancel', async (req, res) => {
     )
     .returning();
   if (!updated) {
-    // Either the order doesn't exist or it's already past the pre-paid window.
-    const existing = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
-    if (!existing) return res.status(404).json({ error: 'not found' });
     return res.status(409).json({ error: `cannot cancel order with status '${existing.status}'` });
   }
+  // Pre-paid → cancelled always releases the reserved unit.
+  await restoreStock(updated.productId, updated.quantity);
   res.json(serializeOrder(updated, false));
 });
 
@@ -207,12 +298,14 @@ ordersRouter.post('/:id/cancel', async (req, res) => {
 /// then call MP; if MP rejects we roll the status back to 'paid'. Crypto refunds
 /// can't move funds automatically (manual treasury send), so those become
 /// 'refund_requested' for an admin to approve + send.
-ordersRouter.post('/:id/refund', async (req, res) => {
+ordersRouter.post('/:id/refund', buyerActionLimiter, async (req, res) => {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) {
     return res.status(404).json({ error: 'not found' });
   }
   const existing = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
   if (!existing) return res.status(404).json({ error: 'not found' });
+  const deny = await checkOrderOwnership(req, existing);
+  if (deny) return res.status(deny.status).json({ error: deny.error });
   if (existing.status !== 'paid') {
     return res.status(409).json({ error: `cannot refund order with status '${existing.status}'` });
   }
@@ -239,11 +332,19 @@ ordersRouter.post('/:id/refund', async (req, res) => {
     try {
       await refundPayment(existing.paymentRef);
     } catch (err) {
+      // Log the provider detail server-side; return a generic error so this
+      // public endpoint never leaks internal payment/provider information.
+      console.error('[orders] buyer refund failed', req.params.id, err instanceof Error ? err.message : err);
       await revertToPaid(req.params.id);
-      return res.status(502).json({ error: err instanceof Error ? err.message : String(err) });
+      return res.status(502).json({ error: 'refund failed, please try again or contact support' });
     }
   }
 
+  // PIX refunds settle to 'refunded' now (releases the unit); crypto stays
+  // 'refund_requested' and releases only when the admin approves it.
+  if (releasesStock('paid', target)) {
+    await restoreStock(claimed.productId, claimed.quantity);
+  }
   res.json(serializeOrder(claimed, false));
 });
 
@@ -263,7 +364,8 @@ ordersRouter.get('/:id/pickup-qr.png', async (req, res) => {
   if (!order || order.deliveryMethod !== 'pickup') return res.status(404).json({ error: 'not found' });
   const png = await QRCode.toBuffer(pickupToken(order.id), { width: 512, margin: 1 });
   res.setHeader('Content-Type', 'image/png');
-  res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+  // Token-bearing response: never cache in shared proxies / email scanners.
+  res.setHeader('Cache-Control', 'private, no-store');
   res.send(png);
 });
 

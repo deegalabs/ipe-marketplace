@@ -5,6 +5,7 @@ import { useAccount } from 'wagmi';
 import { Link } from 'wouter';
 import { api, type OrderDTO, type ProductDTO } from '../api';
 import { formatToken, formatBrl } from '../lib/format';
+import { safeWalletUri } from '../lib/uri';
 import { ProductImage } from '../components/ProductImage';
 import { SkeletonBox, SkeletonText } from '../components/Skeleton';
 import { useToast } from '../lib/toast';
@@ -335,9 +336,9 @@ function ResumePaymentModal({ order: o, onClose }: { order: OrderDTO; onClose: (
                 alt={`${o.cryptoPayCurrency ?? 'crypto'} payment QR`}
                 className="mx-auto w-56 h-56 rounded border border-ipe-green/10 bg-white"
               />
-              {o.cryptoPayUri && (
+              {safeWalletUri(o.cryptoPayUri) && (
                 <a
-                  href={o.cryptoPayUri}
+                  href={safeWalletUri(o.cryptoPayUri) as string}
                   className="btn-ghost w-full text-xs sm:hidden"
                   rel="noreferrer"
                 >

@@ -52,6 +52,36 @@ export async function authenticateAdmin(token: string): Promise<AdminContext | n
   return null;
 }
 
+/// Verifies a Privy access token and returns the lowercased wallet addresses
+/// linked to that account (embedded + external). Used to authorize buyer
+/// endpoints keyed on a wallet address. Throws on Privy SDK errors.
+export async function authenticateWallet(token: string): Promise<string[]> {
+  const claims = await privyClient().verifyAuthToken(token);
+  const user = await privyClient().getUserById(claims.userId);
+  return collectWallets(user);
+}
+
+/// Verifies a Privy token and returns the identity (wallets + emails, all
+/// lowercased) to authorize buyer actions on an order they own.
+export async function authenticateIdentity(token: string): Promise<{ wallets: string[]; emails: string[] }> {
+  const claims = await privyClient().verifyAuthToken(token);
+  const user = await privyClient().getUserById(claims.userId);
+  return { wallets: collectWallets(user), emails: collectEmails(user).map((e) => e.toLowerCase()) };
+}
+
+/// All wallet addresses on a Privy account: the primary wallet plus any linked
+/// wallet accounts, lowercased for comparison against stored buyerAddress.
+function collectWallets(user: Awaited<ReturnType<PrivyClient['getUserById']>>): string[] {
+  const out = new Set<string>();
+  if (user.wallet?.address) out.add(user.wallet.address.toLowerCase());
+  for (const acc of user.linkedAccounts ?? []) {
+    if (acc.type === 'wallet' && 'address' in acc && typeof acc.address === 'string') {
+      out.add(acc.address.toLowerCase());
+    }
+  }
+  return [...out];
+}
+
 /// All emails on a Privy account: the primary email login plus any linked
 /// email accounts. Privy returns these in different shapes; we normalize.
 function collectEmails(user: Awaited<ReturnType<PrivyClient['getUserById']>>): string[] {

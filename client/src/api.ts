@@ -12,6 +12,8 @@ export function setPrivyTokenGetter(fn: () => Promise<string | null>) {
 interface RequestOpts extends RequestInit {
   /// Attach the Privy access token as Bearer for admin-gated endpoints.
   admin?: boolean;
+  /// Attach the Privy access token for buyer-authenticated (non-admin) endpoints.
+  auth?: boolean;
 }
 
 async function request<T>(path: string, init?: RequestOpts): Promise<T> {
@@ -19,7 +21,7 @@ async function request<T>(path: string, init?: RequestOpts): Promise<T> {
     'Content-Type': 'application/json',
     ...((init?.headers as Record<string, string>) ?? {}),
   };
-  if (init?.admin && privyTokenGetter) {
+  if ((init?.admin || init?.auth) && privyTokenGetter) {
     const token = await privyTokenGetter();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
@@ -150,7 +152,7 @@ export const api = {
   createOrder: (input: CreateOrderInput) =>
     request<OrderDTO>('/orders', { method: 'POST', body: JSON.stringify(input, replacer) }),
   ordersByBuyer: (address: string) =>
-    request<OrderDTO[]>(`/orders/by-buyer/${address.toLowerCase()}`),
+    request<OrderDTO[]>(`/orders/by-buyer/${address.toLowerCase()}`, { auth: true }),
   getOrder: (id: string) => request<OrderDTO>(`/orders/${id}`),
   adminOrders: () => request<OrderDTO[]>('/orders/admin', { admin: true }),
   updateOrder: (id: string, body: { status?: string; trackingCode?: string }) =>
@@ -215,13 +217,13 @@ export const api = {
   /// Buyer-initiated cancel. Only succeeds while the order is in 'pending'
   /// or 'awaiting_payment' — once paid, status changes go through admin.
   cancelOrder: (id: string) =>
-    request<OrderDTO>(`/orders/${id}/cancel`, { method: 'POST' }),
+    request<OrderDTO>(`/orders/${id}/cancel`, { method: 'POST', auth: true }),
 
   /// Buyer-initiated refund. Only succeeds while the order is still 'paid'
   /// (not yet shipped/delivered). PIX refunds instantly; crypto orders become
   /// 'refund_requested' for an admin to approve + send manually.
   requestRefund: (id: string) =>
-    request<OrderDTO>(`/orders/${id}/refund`, { method: 'POST' }),
+    request<OrderDTO>(`/orders/${id}/refund`, { method: 'POST', auth: true }),
 
   treasury: () => request<TreasuryDTO>('/treasury'),
   rates: () => request<Rates>('/rates'),
