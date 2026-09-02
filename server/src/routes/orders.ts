@@ -13,8 +13,9 @@ import {
   sendOrderDelivered,
 } from '../services/email.js';
 import { requireAdmin } from '../middleware/requireAdmin.js';
-import { authenticateWallet } from '../services/auth.js';
+import { authenticateWallet, authenticateIdentity } from '../services/auth.js';
 import { reserveStock, restoreStock } from '../services/stock.js';
+import type { Request } from 'express';
 import { refundPayment } from '../services/mercadopago.js';
 import { pickupToken, verifyPickupToken } from '../services/pickupToken.js';
 
@@ -31,6 +32,35 @@ const buyerActionLimiter = rateLimit({ windowMs: 60_000, limit: 10, standardHead
 const RETURNABLE_FROM = new Set(['pending', 'awaiting_payment', 'paid', 'refund_requested']);
 function releasesStock(from: string, to: string): boolean {
   return (to === 'cancelled' || to === 'refunded') && RETURNABLE_FROM.has(from);
+}
+
+function bearerToken(req: Request): string | null {
+  const auth = req.header('authorization') ?? '';
+  return auth.startsWith('Bearer ') ? auth.slice('Bearer '.length) : null;
+}
+
+/// Buyer actions (cancel/refund) on a WALLET-linked order require a Privy
+/// session that owns it (wallet or email match). Email-only orders have no
+/// session to bind to, so they keep the UUID-as-authorization model (guarded by
+/// the tighter buyerActionLimiter). Returns null when allowed, or the error to
+/// send when denied.
+async function checkOrderOwnership(
+  req: Request,
+  order: { buyerAddress: string | null; customerEmail: string | null },
+): Promise<{ status: number; error: string } | null> {
+  if (!order.buyerAddress) return null; // email-only → UUID auth
+  const token = bearerToken(req);
+  if (!token) return { status: 401, error: 'missing token' };
+  try {
+    const ident = await authenticateIdentity(token);
+    const owns =
+      ident.wallets.includes(order.buyerAddress.toLowerCase()) ||
+      (!!order.customerEmail && ident.emails.includes(order.customerEmail.toLowerCase()));
+    return owns ? null : { status: 403, error: 'not your order' };
+  } catch (err) {
+    console.warn('[auth] order owner verification failed:', err instanceof Error ? err.message : err);
+    return { status: 401, error: 'invalid or expired session' };
+  }
 }
 
 ordersRouter.post('/', async (req, res) => {
@@ -233,6 +263,11 @@ ordersRouter.post('/:id/cancel', buyerActionLimiter, async (req, res) => {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) {
     return res.status(404).json({ error: 'not found' });
   }
+  const existing = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  const deny = await checkOrderOwnership(req, existing);
+  if (deny) return res.status(deny.status).json({ error: deny.error });
+
   const [updated] = await db
     .update(schema.orders)
     .set({ status: 'cancelled', updatedAt: new Date() })
@@ -244,9 +279,6 @@ ordersRouter.post('/:id/cancel', buyerActionLimiter, async (req, res) => {
     )
     .returning();
   if (!updated) {
-    // Either the order doesn't exist or it's already past the pre-paid window.
-    const existing = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
-    if (!existing) return res.status(404).json({ error: 'not found' });
     return res.status(409).json({ error: `cannot cancel order with status '${existing.status}'` });
   }
   // Pre-paid → cancelled always releases the reserved unit.
@@ -272,6 +304,8 @@ ordersRouter.post('/:id/refund', buyerActionLimiter, async (req, res) => {
   }
   const existing = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
   if (!existing) return res.status(404).json({ error: 'not found' });
+  const deny = await checkOrderOwnership(req, existing);
+  if (deny) return res.status(deny.status).json({ error: deny.error });
   if (existing.status !== 'paid') {
     return res.status(409).json({ error: `cannot refund order with status '${existing.status}'` });
   }
